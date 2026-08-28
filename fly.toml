@@ -1,27 +1,32 @@
-app = "amol-nama"
+# fly.toml app configuration file generated for amol-nama on 2026-08-28T18:33:50Z
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
 
-primary_region = "sin"
+app = 'amol-nama'
+primary_region = 'sin'
 
 [build]
 
-[env]
-  PYTHONUNBUFFERED = "1"
-
 [deploy]
-  strategy = "immediate"
+  strategy = 'immediate'
 
-[[vm]]
-  memory = "512mb"
-  cpu_kind = "shared"
-  cpus = 1
+[env]
+  PYTHONUNBUFFERED = '1'
 
 [processes]
-  app = "python bot.py"
+  app = 'python bot.py'
 
 [http_service]
   internal_port = 8080
   force_https = true
-  auto_stop_machines = "off"
+  auto_stop_machines = 'off'
   auto_start_machines = true
   min_machines_running = 1
-  processes = ["app"]
+  processes = ['app']
+
+[[vm]]
+  memory = '512mb'
+  cpu_kind = 'shared'
+  cpus = 1
+  memory_mb = 512
