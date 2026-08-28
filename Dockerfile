@@ -1,14 +1,27 @@
-FROM python:3.12-slim
+app = "আমল নামা"
 
-WORKDIR /app
+primary_region = "sin"
 
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONDONTWRITEBYTECODE=1
+[build]
 
-COPY requirements.txt .
+[env]
+  PYTHONUNBUFFERED = "1"
 
-RUN pip install --no-cache-dir -r requirements.txt
+[deploy]
+  strategy = "immediate"
 
-COPY bot.py .
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1
 
-CMD ["python", "bot.py"]
+[processes]
+  app = "python bot.py"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
