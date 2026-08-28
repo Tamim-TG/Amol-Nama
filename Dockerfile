@@ -1,4 +1,4 @@
-app = "আমল নামা"
+app = "amol-nama"
 
 primary_region = "sin"
 
