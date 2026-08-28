@@ -9,7 +9,7 @@ from supabase import create_client, Client
 
 
 # =========================
-# CONFIG
+# SETTINGS
 # =========================
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -26,6 +26,10 @@ if not SUPABASE_KEY:
     raise RuntimeError("SUPABASE_KEY is missing")
 
 
+# Bangladesh Time (UTC+6)
+BD_TZ = timezone(timedelta(hours=6))
+
+
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
@@ -33,6 +37,7 @@ supabase: Client = create_client(
     SUPABASE_URL,
     SUPABASE_KEY
 )
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -42,20 +47,20 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-# Bangladesh time = UTC+6
-BD_TZ = timezone(timedelta(hours=6))
-
-
 # =========================
-# DATE
+# DATE FUNCTIONS
 # =========================
 
-def today_bd():
-    return datetime.now(BD_TZ).date()
+def bd_now():
+    return datetime.now(BD_TZ)
+
+
+def today():
+    return bd_now().date()
 
 
 def today_string():
-    return today_bd().isoformat()
+    return today().isoformat()
 
 
 # =========================
@@ -67,13 +72,14 @@ async def start_command(message: types.Message):
 
     await message.answer(
         "📚 Study Tracker Bot\n\n"
-        "আপনার আজকের পড়ার সময় দিতে লিখুন:\n\n"
-        "/study 2\n\n"
-        "এখানে 2 মানে 2 ঘণ্টা।\n\n"
-        "একই দিনে আবার /study দিলে আগের সময় "
-        "replace হয়ে নতুন সময় save হবে।\n\n"
+        "আজ কত ঘণ্টা পড়েছেন লিখুন:\n\n"
+        "/study 2\n"
+        "/study 3.5\n"
+        "/study 5\n\n"
+        "⚠️ একই দিনে আবার /study দিলে "
+        "আগের সময় replace হবে।\n\n"
         "উদাহরণ:\n"
-        "/study 5.5"
+        "/study 4"
     )
 
 
@@ -84,55 +90,47 @@ async def start_command(message: types.Message):
 @dp.message(Command("study"))
 async def study_command(message: types.Message):
 
-    args = message.text.split()
+    parts = message.text.split()
 
-    if len(args) != 2:
+    if len(parts) != 2:
 
         await message.answer(
-            "❌ সঠিক format:\n\n"
+            "❌ সঠিক নিয়ম:\n\n"
             "/study 2\n"
-            "/study 3.5"
+            "/study 3.5\n"
+            "/study 5"
         )
-
         return
 
     try:
-        hours = float(args[1])
+        hours = float(parts[1])
 
     except ValueError:
 
         await message.answer(
-            "❌ ঘণ্টার সংখ্যা সঠিকভাবে দিন।\n\n"
-            "উদাহরণ:\n"
-            "/study 2.5"
+            "❌ সঠিক ঘণ্টা লিখুন।\n\n"
+            "উদাহরণ: /study 3.5"
         )
-
         return
 
     if hours <= 0 or hours > 24:
 
         await message.answer(
-            "❌ সময় 0 থেকে 24 ঘণ্টার মধ্যে হতে হবে।"
+            "❌ সময় 0-এর বেশি এবং সর্বোচ্চ 24 ঘণ্টা হতে হবে।"
         )
-
         return
 
     user = message.from_user
     chat = message.chat
 
-    user_name = (
-        user.full_name
-        or user.username
-        or str(user.id)
-    )
-
+    name = user.full_name or "Unknown"
     username = user.username or ""
 
     study_date = today_string()
 
     try:
 
-        # Group/chat save
+        # Save group
         supabase.table("study_chats").upsert(
             {
                 "chat_id": chat.id,
@@ -141,13 +139,13 @@ async def study_command(message: types.Message):
             on_conflict="chat_id"
         ).execute()
 
-        # User + today's value
-        # Same user + same day = replace previous value
+
+        # Save / replace today's study time
         supabase.table("study_records").upsert(
             {
                 "chat_id": chat.id,
                 "telegram_user_id": user.id,
-                "name": user_name,
+                "name": name,
                 "username": username,
                 "study_date": study_date,
                 "hours": hours
@@ -155,15 +153,23 @@ async def study_command(message: types.Message):
             on_conflict="chat_id,telegram_user_id,study_date"
         ).execute()
 
+
+        if hours.is_integer():
+            hour_text = str(int(hours))
+        else:
+            hour_text = str(hours)
+
+
         await message.answer(
-            f"✅ Saved!\n\n"
-            f"👤 {user_name}\n"
-            f"📚 আজকের সর্বশেষ সময়: {hours:g} ঘণ্টা\n\n"
-            f"আগের সময় replace হয়ে গেছে।"
+            f"✅ <b>সময় Save হয়েছে!</b>\n\n"
+            f"👤 {name}\n"
+            f"📚 সর্বশেষ সময়: <b>{hour_text} ঘণ্টা</b>\n\n"
+            f"আগের সময় replace হয়েছে।",
+            parse_mode="HTML"
         )
 
         logger.info(
-            "Study saved | chat=%s user=%s hours=%s date=%s",
+            "Saved: chat=%s user=%s hours=%s date=%s",
             chat.id,
             user.id,
             hours,
@@ -172,19 +178,18 @@ async def study_command(message: types.Message):
 
     except Exception as e:
 
-        logger.exception("Database error")
+        logger.exception("Study save error")
 
         await message.answer(
-            "⚠️ Data save করতে সমস্যা হয়েছে। "
-            "কিছুক্ষণ পরে আবার চেষ্টা করুন।"
+            "⚠️ সময় Save করতে সমস্যা হয়েছে।"
         )
 
 
 # =========================
-# LEADERBOARD
+# GET LEADERBOARD
 # =========================
 
-async def get_leaderboard(chat_id: int, study_date: str):
+def get_leaderboard(chat_id, study_date):
 
     result = (
         supabase
@@ -199,25 +204,31 @@ async def get_leaderboard(chat_id: int, study_date: str):
     return result.data or []
 
 
-def make_leaderboard(records, date_string):
+# =========================
+# LEADERBOARD TEXT
+# =========================
+
+def leaderboard_text(records, date_text):
 
     if not records:
 
         return (
-            f"🏆 <b>Study Leaderboard</b>\n"
-            f"📅 {date_string}\n\n"
-            f"আজ এখনো কেউ study time দেয়নি।"
+            "🏆 <b>Study Leaderboard</b>\n"
+            f"📅 {date_text}\n\n"
+            "আজ কেউ Study Time দেয়নি।"
         )
+
 
     medals = ["🥇", "🥈", "🥉"]
 
     lines = [
         "🏆 <b>Study Leaderboard</b>",
-        f"📅 {date_string}",
+        f"📅 {date_text}",
         ""
     ]
 
-    for index, row in enumerate(records):
+
+    for i, row in enumerate(records):
 
         name = row.get("name") or "Unknown"
         hours = float(row.get("hours") or 0)
@@ -227,20 +238,21 @@ def make_leaderboard(records, date_string):
         else:
             hour_text = f"{hours:g} ঘণ্টা"
 
-        if index < 3:
-            prefix = medals[index]
+
+        if i < 3:
+            position = medals[i]
         else:
-            prefix = f"{index + 1}."
+            position = f"{i + 1}."
+
 
         lines.append(
-            f"{prefix} {name} — <b>{hour_text}</b>"
+            f"{position} {name} — <b>{hour_text}</b>"
         )
 
-    lines.extend(
-        [
-            "",
-            "📌 প্রত্যেকের সর্বশেষ দেওয়া সময় দেখানো হয়েছে।"
-        ]
+
+    lines.append("")
+    lines.append(
+        "📌 প্রত্যেক সদস্যের সর্বশেষ দেওয়া সময় দেখানো হয়েছে।"
     )
 
     return "\n".join(lines)
@@ -253,18 +265,18 @@ def make_leaderboard(records, date_string):
 @dp.message(Command("leaderboard"))
 async def leaderboard_command(message: types.Message):
 
-    study_date = today_string()
+    date_text = today_string()
 
     try:
 
-        records = await get_leaderboard(
+        records = get_leaderboard(
             message.chat.id,
-            study_date
+            date_text
         )
 
-        text = make_leaderboard(
+        text = leaderboard_text(
             records,
-            study_date
+            date_text
         )
 
         await message.answer(
@@ -285,34 +297,31 @@ async def leaderboard_command(message: types.Message):
 # MIDNIGHT LEADERBOARD
 # =========================
 
-async def post_daily_leaderboards():
+async def post_midnight_leaderboard():
 
-    """
-    Every day after midnight:
-    - previous day's leaderboard is posted
-    - previous data remains in Supabase
-    - new day automatically starts
-    """
-
-    yesterday = (
-        today_bd() - timedelta(days=1)
+    # রাত ১২টার পর আগের দিনের হিসাব
+    previous_date = (
+        today() - timedelta(days=1)
     ).isoformat()
 
+
     logger.info(
-        "Preparing leaderboard for %s",
-        yesterday
+        "Posting leaderboard for %s",
+        previous_date
     )
+
 
     try:
 
-        chats_result = (
+        result = (
             supabase
             .table("study_chats")
-            .select("chat_id, chat_title")
+            .select("chat_id")
             .execute()
         )
 
-        chats = chats_result.data or []
+        chats = result.data or []
+
 
         for chat in chats:
 
@@ -320,78 +329,84 @@ async def post_daily_leaderboards():
 
             try:
 
-                # Check if already posted
-                existing = (
+                # Already posted?
+                already = (
                     supabase
                     .table("daily_posts")
                     .select("id")
                     .eq("chat_id", chat_id)
-                    .eq("study_date", yesterday)
+                    .eq("study_date", previous_date)
                     .limit(1)
                     .execute()
                 )
 
-                if existing.data:
+
+                if already.data:
                     continue
 
-                records = await get_leaderboard(
+
+                records = get_leaderboard(
                     chat_id,
-                    yesterday
+                    previous_date
                 )
 
-                text = make_leaderboard(
+
+                text = leaderboard_text(
                     records,
-                    yesterday
+                    previous_date
                 )
+
 
                 sent = await bot.send_message(
-                    chat_id=chat_id,
-                    text=text,
+                    chat_id,
+                    text,
                     parse_mode="HTML"
                 )
 
-                # Save post information
+
+                # Mark as posted
                 supabase.table("daily_posts").insert(
                     {
                         "chat_id": chat_id,
-                        "study_date": yesterday,
+                        "study_date": previous_date,
                         "telegram_message_id": sent.message_id
                     }
                 ).execute()
 
+
                 logger.info(
-                    "Leaderboard posted | chat=%s date=%s",
-                    chat_id,
-                    yesterday
+                    "Leaderboard posted: %s",
+                    chat_id
                 )
+
 
             except Exception:
 
                 logger.exception(
-                    "Could not post leaderboard | chat=%s",
+                    "Could not post to chat %s",
                     chat_id
                 )
+
 
     except Exception:
 
         logger.exception(
-            "Could not load chats"
+            "Could not load study chats"
         )
 
 
 # =========================
-# MIDNIGHT SCHEDULER
+# MIDNIGHT TIMER
 # =========================
 
 async def midnight_scheduler():
 
     while True:
 
-        now = datetime.now(BD_TZ)
+        now = bd_now()
 
-        tomorrow = (
-            now.date() + timedelta(days=1)
-        )
+        tomorrow = now.date() + timedelta(days=1)
+
 
         next_midnight = datetime.combine(
             tomorrow,
@@ -399,31 +414,35 @@ async def midnight_scheduler():
             tzinfo=BD_TZ
         )
 
+
         seconds = (
             next_midnight - now
         ).total_seconds()
 
+
         logger.info(
-            "Next midnight in %.0f seconds",
+            "Next reset/leaderboard in %.0f seconds",
             seconds
         )
 
-        # Sleep until midnight
+
         await asyncio.sleep(
             max(seconds, 1)
         )
 
+
         try:
 
-            await post_daily_leaderboards()
+            await post_midnight_leaderboard()
 
         except Exception:
 
             logger.exception(
-                "Midnight task failed"
+                "Midnight task error"
             )
 
-        # Small delay so it doesn't run twice
+
+        # Prevent double execution
         await asyncio.sleep(5)
 
 
@@ -433,35 +452,41 @@ async def midnight_scheduler():
 
 async def main():
 
-    logger.info(
-        "Study Bot starting..."
-    )
+    logger.info("🚀 Study Bot starting...")
 
-    scheduler_task = asyncio.create_task(
+
+    scheduler = asyncio.create_task(
         midnight_scheduler()
     )
 
+
     try:
 
-        # Delete old webhook if any
+        # Remove previous webhook
         await bot.delete_webhook(
             drop_pending_updates=False
         )
 
-        # Start Telegram polling
+
+        # Start bot
         await dp.start_polling(bot)
+
 
     finally:
 
-        scheduler_task.cancel()
+        scheduler.cancel()
 
         try:
-            await scheduler_task
+            await scheduler
         except asyncio.CancelledError:
             pass
 
         await bot.session.close()
 
+
+# =========================
+# RUN
+# =========================
 
 if __name__ == "__main__":
 
@@ -470,6 +495,4 @@ if __name__ == "__main__":
 
     except KeyboardInterrupt:
 
-        logger.info(
-            "Bot stopped"
-        )
+        logger.info("Bot stopped")
