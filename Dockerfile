@@ -1,27 +1,14 @@
-app = "amol-nama"
+FROM python:3.12-slim
 
-primary_region = "sin"
+WORKDIR /app
 
-[build]
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
 
-[env]
-  PYTHONUNBUFFERED = "1"
+COPY requirements.txt .
 
-[deploy]
-  strategy = "immediate"
+RUN pip install --no-cache-dir -r requirements.txt
 
-[[vm]]
-  memory = "512mb"
-  cpu_kind = "shared"
-  cpus = 1
+COPY bot.py .
 
-[processes]
-  app = "python bot.py"
-
-[http_service]
-  internal_port = 8080
-  force_https = true
-  auto_stop_machines = "off"
-  auto_start_machines = true
-  min_machines_running = 1
-  processes = ["app"]
+CMD ["python", "bot.py"]
