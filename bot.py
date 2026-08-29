@@ -1,5 +1,6 @@
 import os
 import asyncio
+from html import escape
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -9,6 +10,8 @@ from supabase import create_client, Client
 from telegram import (
     Update,
     ReplyKeyboardMarkup,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
 )
 from telegram.ext import (
     Application,
@@ -30,6 +33,7 @@ SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
 
 GROUP_ID = int(os.getenv("GROUP_ID", "0"))
+DEV_CHAT_ID = int(os.getenv("DEV_CHAT_ID", "0"))
 
 supabase: Client = create_client(
     SUPABASE_URL,
@@ -41,14 +45,15 @@ supabase: Client = create_client(
 # TELEGRAM GROUP / CHANNEL
 # ==================================================
 
-# তোমার GROUP ID এখানে দাও
-# উদাহরণ: -1001234567890
-GROUP_ID = int(os.environ.get("GROUP_ID", "0"))
-
-# তোমার Channel username
 CHANNEL_USERNAME = os.environ.get(
     "CHANNEL_USERNAME",
     "@FixerZoneOfficial"
+)
+
+# Optional Facebook destination. This is a link, not a Telegram membership check.
+FACEBOOK_CHANNEL_URL = os.environ.get(
+    "FACEBOOK_CHANNEL_URL",
+    ""
 )
 
 
@@ -115,6 +120,8 @@ async def start_health_server():
         f"Health server running on port {port}"
     )
 
+    return runner
+
 
 # ==================================================
 # MEMBERSHIP CHECK
@@ -144,10 +151,16 @@ async def check_membership(
             )
 
             group_status = group_member.status
+            group_is_member = getattr(
+                group_member, "is_member", True
+            )
 
             if group_status in (
                 "left",
                 "kicked"
+            ) or (
+                group_status == "restricted"
+                and not group_is_member
             ):
 
                 await send_join_menu(
@@ -166,10 +179,16 @@ async def check_membership(
         )
 
         channel_status = channel_member.status
+        channel_is_member = getattr(
+            channel_member, "is_member", True
+        )
 
         if channel_status in (
             "left",
             "kicked"
+        ) or (
+            channel_status == "restricted"
+            and not channel_is_member
         ):
 
             await send_join_menu(
@@ -412,9 +431,7 @@ async def contact_dev(
 
     user = query.from_user
 
-    dev_chat_id = int(
-        os.getenv("DEV_CHAT_ID", "0")
-    )
+    dev_chat_id = DEV_CHAT_ID
 
     if not dev_chat_id:
         await query.message.reply_text(
@@ -424,13 +441,13 @@ async def contact_dev(
 
     text = (
         "📩 <b>New Developer Contact</b>\n\n"
-        f"👤 <b>Name:</b> {user.full_name}\n"
+        f"👤 <b>Name:</b> {escape(user.full_name)}\n"
         f"🆔 <b>User ID:</b> <code>{user.id}</code>\n"
     )
 
     if user.username:
         text += (
-            f"🔗 <b>Username:</b> @{user.username}\n"
+            f"🔗 <b>Username:</b> @{escape(user.username)}\n"
         )
 
     text += (
@@ -477,6 +494,12 @@ async def reply_to_user(
 
     await query.answer()
 
+    if DEV_CHAT_ID and (
+        not query.message
+        or query.message.chat_id != DEV_CHAT_ID
+    ):
+        return
+
     user_id = query.data.split(":")[1]
 
     context.user_data["reply_to_user"] = int(user_id)
@@ -503,6 +526,9 @@ async def send_dev_reply(
     if update.effective_chat.type != "private":
         return
 
+    if DEV_CHAT_ID and update.effective_chat.id != DEV_CHAT_ID:
+        return
+
     target_user_id = context.user_data.get(
         "reply_to_user"
     )
@@ -521,7 +547,7 @@ async def send_dev_reply(
             chat_id=target_user_id,
             text=(
                 "👨‍💻 <b>Developer Reply</b>\n\n"
-                f"{message_text}"
+                f"{escape(message_text)}"
             ),
             parse_mode="HTML"
         )
@@ -918,7 +944,7 @@ async def leaderboard(
 
             text += (
                 f"{position} "
-                f"<b>{name}</b> — "
+                f"<b>{escape(str(name))}</b> — "
                 f"{hours:g} ঘণ্টা\n"
             )
 
@@ -951,31 +977,6 @@ async def leaderboard(
             "⚠️ Leaderboard দেখাতে "
             "সমস্যা হয়েছে।"
         )
-
-
-# ==================================================
-# DEVELOPER BUTTON
-# ==================================================
-
-async def developer_button(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
-
-    if not update.message:
-        return
-
-    if update.effective_chat.type != "private":
-        return
-
-    await update.message.reply_text(
-        "👨‍💻 <b>Developer</b>\n\n"
-        "📚 Amol Nama Study Bot\n\n"
-        "🤖 Study Time Tracker\n"
-        "🏆 Daily Leaderboard",
-        parse_mode="HTML",
-        reply_markup=get_main_keyboard()
-    )
 
 
 # ==================================================
@@ -1012,9 +1013,15 @@ async def join_button(
 
     if text == "📣 ফেসবুক বট চ্যানেলে জয়েন":
 
-        await update.message.reply_text(
-            "📣 Facebook Bot Channel"
-        )
+        if FACEBOOK_CHANNEL_URL:
+            await update.message.reply_text(
+                "📣 Facebook Bot Channel-এ Join করুন:\n\n"
+                f"{FACEBOOK_CHANNEL_URL}"
+            )
+        else:
+            await update.message.reply_text(
+                "⚠️ FACEBOOK_CHANNEL_URL সেট করা হয়নি।"
+            )
 
         return
 
@@ -1053,7 +1060,7 @@ async def private_text_handler(
 
     text = update.message.text
 
-        # ----------------------------------------------
+    # ----------------------------------------------
     # Developer Reply
     # ----------------------------------------------
 
@@ -1223,7 +1230,7 @@ async def send_yesterday_leaderboards(
 
                     text += (
                         f"{position} "
-                        f"<b>{name}</b> — "
+                        f"<b>{escape(str(name))}</b> — "
                         f"{hours:g} ঘণ্টা\n"
                     )
 
@@ -1334,30 +1341,37 @@ async def main():
         )
     )
 
-# ----------------------------------------------
-# Private buttons / text
-# ----------------------------------------------
+    # ----------------------------------------------
+    # Private buttons / text
+    # ----------------------------------------------
 
-application.add_handler(
-    MessageHandler(
-        filters.Regex("^📚 Study$"),
-        study_button
+    application.add_handler(
+        MessageHandler(
+            filters.Regex("^📚 Study$"),
+            study_button
+        )
     )
-)
 
-application.add_handler(
-    MessageHandler(
-        filters.Regex("^👨‍💻 Developer$"),
-        developer_button
+    application.add_handler(
+        MessageHandler(
+            filters.Regex("^🏆 Leaderboard$"),
+            leaderboard
+        )
     )
-)
 
-application.add_handler(
-    MessageHandler(
-        filters.TEXT & ~filters.COMMAND,
-        private_text_handler
+    application.add_handler(
+        MessageHandler(
+            filters.Regex("^👨‍💻 Developer$"),
+            developer_button
+        )
     )
-)
+
+    application.add_handler(
+        MessageHandler(
+            filters.TEXT & ~filters.COMMAND,
+            private_text_handler
+        )
+    )
 
     # ----------------------------------------------
     # Developer callbacks
@@ -1410,6 +1424,7 @@ application.add_handler(
         await application.updater.stop()
         await application.stop()
         await application.shutdown()
+        await health_runner.cleanup()
 
 
 # ==================================================
