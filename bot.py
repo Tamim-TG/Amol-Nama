@@ -311,13 +311,6 @@ async def start(
         reply_markup=join_markup
     )
 
-
-    await update.message.reply_text(
-        "👇 নিচের মেনু থেকে অপশন নির্বাচন করুন।",
-        reply_markup=reply_markup
-    )
-
-
 # ==================================================
 # JOIN / VERIFY BUTTON
 # ==================================================
