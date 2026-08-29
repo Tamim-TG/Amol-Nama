@@ -1334,38 +1334,30 @@ async def main():
         )
     )
 
-    # ----------------------------------------------
-    # Private buttons / text
-    # ----------------------------------------------
+# ----------------------------------------------
+# Private buttons / text
+# ----------------------------------------------
 
-    application.add_handler(
-        MessageHandler(
-            filters.Regex("^📚 Study$"),
-            study_button
-        )
+application.add_handler(
+    MessageHandler(
+        filters.Regex("^📚 Study$"),
+        study_button
     )
+)
 
-    application.add_handler(
-        MessageHandler(
-            filters.Regex("^🏆 Leaderboard$"),
-            leaderboard_button
-        )
+application.add_handler(
+    MessageHandler(
+        filters.Regex("^👨‍💻 Developer$"),
+        developer_button
     )
+)
 
-    application.add_handler(
-        MessageHandler(
-            filters.Regex("^👨‍💻 Developer$"),
-            developer_button
-        )
+application.add_handler(
+    MessageHandler(
+        filters.TEXT & ~filters.COMMAND,
+        private_text_handler
     )
-
-    # Study number input + Developer reply
-    application.add_handler(
-        MessageHandler(
-            filters.TEXT & ~filters.COMMAND,
-            private_text_handler
-        )
-    )
+)
 
     # ----------------------------------------------
     # Developer callbacks
