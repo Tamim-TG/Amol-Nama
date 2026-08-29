@@ -75,6 +75,29 @@ def yesterday():
 
 
 # ==================================================
+# MAIN PRIVATE MENU
+# ==================================================
+
+def get_main_menu():
+
+    keyboard = [
+        [
+            KeyboardButton("📚 Study"),
+            KeyboardButton("🏆 Leaderboard")
+        ],
+        [
+            KeyboardButton("👨‍💻 Developer")
+        ]
+    ]
+
+    return ReplyKeyboardMarkup(
+        keyboard,
+        resize_keyboard=True,
+        is_persistent=True
+    )
+
+
+# ==================================================
 # MEMBERSHIP CHECK
 # ==================================================
 
@@ -89,10 +112,12 @@ async def check_membership(
         return False
 
 
-    # Message location
+    # ==================================================
+    # MESSAGE / CALLBACK MESSAGE
+    # ==================================================
+
     message = update.message
 
-    # Callback location
     if not message and update.callback_query:
         message = update.callback_query.message
 
@@ -116,21 +141,19 @@ async def check_membership(
             keyboard = [
                 [
                     InlineKeyboardButton(
-                        "👥 Join Group",
+                        "👥 গ্রুপে জয়েন",
                         url="https://t.me/+ft6UwgnBRfhjZWFl"
                     )
                 ]
             ]
 
-
             if message:
 
                 await message.reply_text(
-                    "❌ আগে Group-এ Join করুন।\n\n"
-                    "Join করার পর আবার চেষ্টা করুন।",
-                    reply_markup=InlineKeyboardMarkup(
-                        keyboard
-                    )
+                    "🔒 <b>বট ব্যবহার করতে হলে প্রথমে গ্রুপে জয়েন করুন।</b>\n\n"
+                    "গ্রুপে জয়েন করার পর আবার চেষ্টা করুন।",
+                    parse_mode="HTML",
+                    reply_markup=InlineKeyboardMarkup(keyboard)
                 )
 
             return False
@@ -171,21 +194,19 @@ async def check_membership(
             keyboard = [
                 [
                     InlineKeyboardButton(
-                        "📢 Join Channel",
+                        "📢 চ্যানেলে জয়েন",
                         url="https://t.me/FixerZoneOfficial"
                     )
                 ]
             ]
 
-
             if message:
 
                 await message.reply_text(
-                    "❌ আগে Channel-এ Join করুন।\n\n"
-                    "Join করার পর আবার চেষ্টা করুন।",
-                    reply_markup=InlineKeyboardMarkup(
-                        keyboard
-                    )
+                    "🔒 <b>বট ব্যবহার করতে হলে প্রথমে চ্যানেলে জয়েন করুন।</b>\n\n"
+                    "চ্যানেলে জয়েন করার পর আবার চেষ্টা করুন।",
+                    parse_mode="HTML",
+                    reply_markup=InlineKeyboardMarkup(keyboard)
                 )
 
             return False
@@ -211,40 +232,20 @@ async def check_membership(
 
 
 # ==================================================
-# PRIVATE /START
+# /START
 # ==================================================
 
-allowed = await check_membership(
-    update,
-    context
-)
+async def start(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
 
-if not allowed:
-    return
+    if not update.message:
+        return
 
 
-reply_keyboard = [
-    [
-        KeyboardButton("📚 Study"),
-        KeyboardButton("🏆 Leaderboard")
-    ],
-    [
-        KeyboardButton("👨‍💻 Developer")
-    ]
-]
+    chat = update.effective_chat
 
-reply_markup = ReplyKeyboardMarkup(
-    reply_keyboard,
-    resize_keyboard=True,
-    is_persistent=True
-)
-
-await update.message.reply_text(
-    "👋 <b>Welcome to Amol Nama Study Bot!</b>\n\n"
-    "👇 নিচের Menu থেকে অপশন নির্বাচন করুন।",
-    parse_mode="HTML",
-    reply_markup=reply_markup
-)
 
     # ==================================================
     # GROUP
@@ -269,67 +270,28 @@ await update.message.reply_text(
     # PRIVATE
     # ==================================================
 
-    reply_keyboard = [
-        [
-            KeyboardButton("📚 Study"),
-            KeyboardButton("🏆 Leaderboard")
-        ],
-        [
-            KeyboardButton("👨‍💻 Developer")
-        ]
-    ]
-
-
-    reply_markup = ReplyKeyboardMarkup(
-        reply_keyboard,
-        resize_keyboard=True,
-        is_persistent=True
+    allowed = await check_membership(
+        update,
+        context
     )
+
+    if not allowed:
+        return
 
 
     # ==================================================
-    # JOIN BUTTONS
+    # JOINED USER
+    # NO JOIN MENU
+    # ONLY MAIN MENU
     # ==================================================
-
-    join_keyboard = [
-        [
-            InlineKeyboardButton(
-                "🤧 গ্রুপে জয়েন",
-                url="https://t.me/+ft6UwgnBRfhjZWFl"
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                "📢 চ্যানেলে জয়েন",
-                url="https://t.me/FixerZoneOfficial"
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                "✅ জয়েন করেছি",
-                callback_data="check_membership"
-            )
-        ]
-    ]
-
-
-    join_markup = InlineKeyboardMarkup(
-        join_keyboard
-    )
-
-
-    text = (
-        "🔒 <b>বট ব্যবহার করতে হলে প্রথমে নিচের সবগুলোতে জয়েন করুন।</b>\n\n"
-        "জয়েন করার পর নিচের ✅ "
-        "\"জয়েন করেছি\" বাটনে ক্লিক করুন।"
-    )
-
 
     await update.message.reply_text(
-        text,
+        "👋 <b>Welcome to Amol Nama Study Bot!</b>\n\n"
+        "👇 নিচের মেনু থেকে একটি অপশন নির্বাচন করুন।",
         parse_mode="HTML",
-        reply_markup=join_markup
+        reply_markup=get_main_menu()
     )
+
 
 # ==================================================
 # JOIN / VERIFY BUTTON
@@ -354,22 +316,26 @@ async def check_membership_button(
         context
     )
 
-
     if not allowed:
         return
 
 
+    # ==================================================
+    # VERIFIED
+    # ==================================================
+
     if query.message:
 
         await query.message.reply_text(
-            "✅ <b>Membership verified!</b>\n\n"
-            "এখন নিচের Menu থেকে Study ব্যবহার করতে পারবেন।",
-            parse_mode="HTML"
+            "✅ <b>Membership Verified!</b>\n\n"
+            "👇 নিচের মেনু থেকে একটি অপশন নির্বাচন করুন।",
+            parse_mode="HTML",
+            reply_markup=get_main_menu()
         )
 
 
 # ==================================================
-# /STUDY — GROUP
+# /STUDY — GROUP ONLY
 # ==================================================
 
 async def study(
@@ -403,7 +369,6 @@ async def study(
         context
     )
 
-
     if not allowed:
         return
 
@@ -415,13 +380,19 @@ async def study(
     if not context.args:
 
         await update.message.reply_text(
-            "📖 আজ কত ঘণ্টা পড়েছেন লিখুন।\n\n"
-            
+            "❌ কত ঘণ্টা পড়েছেন লিখুন।\n\n"
+            "উদাহরণ:\n"
+            "<code>/study 2</code>\n"
+            "<code>/study 2.5</code>",
             parse_mode="HTML"
         )
 
         return
 
+
+    # ==================================================
+    # NUMBER
+    # ==================================================
 
     try:
 
@@ -433,11 +404,16 @@ async def study(
 
         await update.message.reply_text(
             "❌ সঠিক সংখ্যা দিন।\n\n"
+            "উদাহরণ: <code>/study 3.5</code>",
             parse_mode="HTML"
         )
 
         return
 
+
+    # ==================================================
+    # VALIDATION
+    # ==================================================
 
     if hours <= 0 or hours > 24:
 
@@ -450,6 +426,7 @@ async def study(
 
 
     user = update.effective_user
+
     study_date = today()
 
 
@@ -458,12 +435,19 @@ async def study(
     # ==================================================
 
     data = {
+
         "chat_id": GROUP_ID,
+
         "user_id": user.id,
+
         "username": user.username or "",
+
         "full_name": user.full_name,
+
         "study_date": study_date,
+
         "hours": hours,
+
         "updated_at": bd_now().isoformat()
     }
 
@@ -494,7 +478,7 @@ async def study(
         )
 
         await update.message.reply_text(
-            "⚠️ Api Call Failed"
+            "⚠️ Study time save করতে সমস্যা হয়েছে।"
         )
 
 
@@ -516,7 +500,7 @@ async def study_button(
 
 
     # ==================================================
-    # MEMBERSHIP CHECK
+    # MEMBERSHIP
     # ==================================================
 
     allowed = await check_membership(
@@ -524,14 +508,17 @@ async def study_button(
         context
     )
 
-
     if not allowed:
         return
 
 
     await update.message.reply_text(
         "📚 <b>Study Time</b>\n\n"
-        "📖আজ কত ঘণ্টা Study করেছেন?\n\n"
+        "আজ কত ঘণ্টা Study করেছেন?\n\n"
+        "উদাহরণ:\n"
+        "<code>2</code>\n"
+        "<code>2.5</code>\n"
+        "<code>3</code>",
         parse_mode="HTML"
     )
 
@@ -558,6 +545,10 @@ async def study_input(
         return
 
 
+    # ==================================================
+    # WAITING?
+    # ==================================================
+
     if not context.user_data.get(
         "waiting_for_study"
     ):
@@ -566,10 +557,13 @@ async def study_input(
 
     text = update.message.text
 
-
     if not text:
         return
 
+
+    # ==================================================
+    # NUMBER
+    # ==================================================
 
     try:
 
@@ -581,11 +575,19 @@ async def study_input(
 
         await update.message.reply_text(
             "⚠️ সঠিক সংখ্যা দিন।\n\n"
+            "উদাহরণ:\n"
+            "<code>2</code>\n"
+            "<code>2.5</code>\n"
+            "<code>3</code>",
             parse_mode="HTML"
         )
 
         return
 
+
+    # ==================================================
+    # VALIDATION
+    # ==================================================
 
     if hours <= 0 or hours > 24:
 
@@ -598,7 +600,7 @@ async def study_input(
 
 
     # ==================================================
-    # MEMBERSHIP CHECK
+    # MEMBERSHIP
     # ==================================================
 
     allowed = await check_membership(
@@ -606,27 +608,34 @@ async def study_input(
         context
     )
 
-
     if not allowed:
         return
 
 
     user = update.effective_user
+
     study_date = today()
 
 
     # ==================================================
-    # IMPORTANT:
-    # PRIVATE STUDY ALSO GOES TO GROUP
+    # PRIVATE STUDY
+    # ALSO SAVE TO GROUP LEADERBOARD
     # ==================================================
 
     data = {
+
         "chat_id": GROUP_ID,
+
         "user_id": user.id,
+
         "username": user.username or "",
+
         "full_name": user.full_name,
+
         "study_date": study_date,
+
         "hours": hours,
+
         "updated_at": bd_now().isoformat()
     }
 
@@ -662,7 +671,7 @@ async def study_input(
         )
 
         await update.message.reply_text(
-            "⚠️ Api call Failed"
+            "⚠️ Study time save করতে সমস্যা হয়েছে।"
         )
 
 
@@ -701,7 +710,8 @@ def get_leaderboard(
 
 
 # ==================================================
-# /LEADERBOARD — GROUP
+# /LEADERBOARD
+# GROUP + PRIVATE
 # ==================================================
 
 async def leaderboard(
@@ -713,21 +723,8 @@ async def leaderboard(
         return
 
 
-    if update.effective_chat.type not in (
-        "group",
-        "supergroup"
-    ):
-
-        # Private হলে একই Group leaderboard দেখাবে
-        chat_id = GROUP_ID
-
-    else:
-
-        chat_id = GROUP_ID
-
-
     # ==================================================
-    # MEMBERSHIP CHECK
+    # MEMBERSHIP
     # ==================================================
 
     allowed = await check_membership(
@@ -735,10 +732,15 @@ async def leaderboard(
         context
     )
 
-
     if not allowed:
         return
 
+
+    # ==================================================
+    # ALWAYS GROUP LEADERBOARD
+    # ==================================================
+
+    chat_id = GROUP_ID
 
     study_date = today()
 
@@ -826,7 +828,7 @@ async def leaderboard(
         )
 
         await update.message.reply_text(
-            "⚠️ Api call Failed"
+            "⚠️ Leaderboard দেখাতে সমস্যা হয়েছে।"
         )
 
 
@@ -891,98 +893,71 @@ async def send_yesterday_leaderboards(
 
     try:
 
-        groups = (
-            supabase
-            .table("study_hours")
-            .select("chat_id")
-            .execute()
+        rows = get_leaderboard(
+            GROUP_ID,
+            report_date
         )
 
 
-        # শুধু GROUP_ID-এর leaderboard
-        chat_ids = {
-            GROUP_ID
-        }
+        if not rows:
+            return
 
 
-        for chat_id in chat_ids:
-
-            try:
-
-                rows = get_leaderboard(
-                    chat_id,
-                    report_date
-                )
+        medals = [
+            "🥇",
+            "🥈",
+            "🥉"
+        ]
 
 
-                if not rows:
-                    continue
+        text = (
+            "🌙 <b>গতকালের Study Leaderboard</b>\n"
+            "━━━━━━━━━━━━━━\n\n"
+            f"📅 {report_date}\n\n"
+        )
 
 
-                medals = [
-                    "🥇",
-                    "🥈",
-                    "🥉"
-                ]
+        for index, row in enumerate(rows):
+
+            name = (
+                row.get("full_name")
+                or row.get("username")
+                or "Unknown"
+            )
 
 
-                text = (
-                    "🌙 <b>গতকালের Study Leaderboard</b>\n"
-                    "━━━━━━━━━━━━━━\n\n"
-                    f"📅 {report_date}\n\n"
-                )
+            hours = float(
+                row.get("hours", 0)
+            )
 
 
-                for index, row in enumerate(rows):
+            if index < 3:
 
-                    name = (
-                        row.get("full_name")
-                        or row.get("username")
-                        or "Unknown"
-                    )
+                position = medals[index]
 
+            else:
 
-                    hours = float(
-                        row.get("hours", 0)
-                    )
+                position = f"{index + 1}."
 
 
-                    if index < 3:
-
-                        position = medals[index]
-
-                    else:
-
-                        position = f"{index + 1}."
+            text += (
+                f"{position} "
+                f"<b>{name}</b> — "
+                f"{hours:g} ঘণ্টা\n"
+            )
 
 
-                    text += (
-                        f"{position} "
-                        f"<b>{name}</b> — "
-                        f"{hours:g} ঘণ্টা\n"
-                    )
+        text += (
+            "\n━━━━━━━━━━━━━━\n"
+            "📚 নতুন দিনের Study Time শুরু হয়েছে।"
+        )
 
 
-                text += (
-                    "\n━━━━━━━━━━━━━━\n"
-                    "📚 নতুন দিনের Study Time শুরু হয়েছে।"
-                )
-
-
-                await application.bot.send_message(
-                    chat_id=chat_id,
-                    text=text,
-                    parse_mode="HTML"
-                )
-
-
-            except Exception as e:
-
-                print(
-                    f"Could not send leaderboard "
-                    f"to {chat_id}:",
-                    e
-                )
+        await application.bot.send_message(
+            chat_id=GROUP_ID,
+            text=text,
+            parse_mode="HTML"
+        )
 
 
     except Exception as e:
@@ -1014,6 +989,7 @@ async def midnight_loop(
         try:
 
             now = bd_now()
+
             current_date = now.date()
 
 
@@ -1142,7 +1118,7 @@ async def main():
 
 
     # ==================================================
-    # CALLBACK HANDLER
+    # JOIN VERIFY CALLBACK
     # ==================================================
 
     application.add_handler(
@@ -1154,7 +1130,7 @@ async def main():
 
 
     # ==================================================
-    # PRIVATE BUTTONS
+    # PRIVATE STUDY BUTTON
     # ==================================================
 
     application.add_handler(
@@ -1165,6 +1141,10 @@ async def main():
     )
 
 
+    # ==================================================
+    # PRIVATE LEADERBOARD BUTTON
+    # ==================================================
+
     application.add_handler(
         MessageHandler(
             filters.Regex("^🏆 Leaderboard$"),
@@ -1172,6 +1152,10 @@ async def main():
         )
     )
 
+
+    # ==================================================
+    # PRIVATE DEVELOPER BUTTON
+    # ==================================================
 
     application.add_handler(
         MessageHandler(
@@ -1229,7 +1213,9 @@ async def main():
         scheduler.cancel()
 
         await application.updater.stop()
+
         await application.stop()
+
         await application.shutdown()
 
 
@@ -1244,7 +1230,6 @@ if __name__ == "__main__":
         asyncio.run(
             main()
         )
-
 
     except KeyboardInterrupt:
 
