@@ -328,7 +328,6 @@ def get_leaderboard(chat_id, study_date):
         .select(
             "user_id, username, full_name, hours"
         )
-        .eq("chat_id", chat_id)
         .eq("study_date", study_date)
         .order("hours", desc=True)
         .execute()
