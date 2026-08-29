@@ -13,8 +13,9 @@ from telegram import (
 from telegram.ext import (
     Application,
     CommandHandler,
-    MessageHandler,
     ContextTypes,
+    CallbackQueryHandler,
+    MessageHandler,
     filters,
 )
 
@@ -27,6 +28,8 @@ BOT_TOKEN = os.environ["BOT_TOKEN"]
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
+
+GROUP_ID = int(os.getenv("GROUP_ID", "0"))
 
 supabase: Client = create_client(
     SUPABASE_URL,
@@ -359,6 +362,188 @@ async def study_button(
         parse_mode="HTML"
     )
 
+# ==================================================
+# DEVELOPER BUTTON
+# ==================================================
+
+async def developer_button(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
+    if not update.message:
+        return
+
+    if update.effective_chat.type != "private":
+        return
+
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                "💬 Contact Dev",
+                callback_data="contact_dev"
+            )
+        ]
+    ]
+
+    await update.message.reply_text(
+        "👨‍💻 <b>Developer</b>\n\n"
+        "কোনো সমস্যা বা প্রয়োজন হলে "
+        "Developer-এর সাথে যোগাযোগ করুন।",
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+# ==================================================
+# CONTACT DEVELOPER
+# ==================================================
+
+async def contact_dev(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
+    query = update.callback_query
+
+    if not query:
+        return
+
+    await query.answer()
+
+    user = query.from_user
+
+    dev_chat_id = int(
+        os.getenv("DEV_CHAT_ID", "0")
+    )
+
+    if not dev_chat_id:
+        await query.message.reply_text(
+            "⚠️ Developer ID সেট করা হয়নি।"
+        )
+        return
+
+    text = (
+        "📩 <b>New Developer Contact</b>\n\n"
+        f"👤 <b>Name:</b> {user.full_name}\n"
+        f"🆔 <b>User ID:</b> <code>{user.id}</code>\n"
+    )
+
+    if user.username:
+        text += (
+            f"🔗 <b>Username:</b> @{user.username}\n"
+        )
+
+    text += (
+        "\n💬 এই User-কে Reply করতে নিচের "
+        "button ব্যবহার করুন।"
+    )
+
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                "💬 Reply",
+                callback_data=f"reply_user:{user.id}"
+            )
+        ]
+    ]
+
+    await context.bot.send_message(
+        chat_id=dev_chat_id,
+        text=text,
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+    await query.message.reply_text(
+        "✅ <b>Developer-এর কাছে আপনার "
+        "যোগাযোগের অনুরোধ পাঠানো হয়েছে।</b>\n\n"
+        "Developer প্রয়োজন হলে আপনাকে reply করবেন।",
+        parse_mode="HTML"
+    )
+
+# ==================================================
+# REPLY TO USER
+# ==================================================
+
+async def reply_to_user(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
+    query = update.callback_query
+
+    if not query:
+        return
+
+    await query.answer()
+
+    user_id = query.data.split(":")[1]
+
+    context.user_data["reply_to_user"] = int(user_id)
+
+    await query.message.reply_text(
+        "✍️ <b>আপনার Reply লিখুন:</b>\n\n"
+        "যে message পাঠাবেন, সেটাই User-এর কাছে "
+        "Developer-এর reply হিসেবে যাবে।",
+        parse_mode="HTML"
+    )
+
+# ==================================================
+# SEND DEVELOPER REPLY
+# ==================================================
+
+async def send_dev_reply(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
+    if not update.message:
+        return
+
+    if update.effective_chat.type != "private":
+        return
+
+    target_user_id = context.user_data.get(
+        "reply_to_user"
+    )
+
+    if not target_user_id:
+        return
+
+    message_text = update.message.text
+
+    if not message_text:
+        return
+
+    try:
+
+        await context.bot.send_message(
+            chat_id=target_user_id,
+            text=(
+                "👨‍💻 <b>Developer Reply</b>\n\n"
+                f"{message_text}"
+            ),
+            parse_mode="HTML"
+        )
+
+        context.user_data[
+            "reply_to_user"
+        ] = None
+
+        await update.message.reply_text(
+            "✅ Reply User-এর কাছে পাঠানো হয়েছে।"
+        )
+
+    except Exception as e:
+
+        print(
+            "Developer reply error:",
+            e
+        )
+
+        await update.message.reply_text(
+            "⚠️ User-এর কাছে Reply পাঠানো যায়নি।"
+        )
 
 # ==================================================
 # SAVE STUDY TIME
