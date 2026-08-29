@@ -292,11 +292,11 @@ async def study(
     try:
 
         supabase.table(
-            "study_hours"
-        ).upsert(
-            data,
-            on_conflict="chat_id,user_id,study_date"
-        ).execute()
+    "study_hours"
+).upsert(
+    data,
+    on_conflict="user_id,study_date"
+).execute()
 
 
         await update.message.reply_text(
