@@ -180,38 +180,101 @@ async def start(
     context: ContextTypes.DEFAULT_TYPE
 ):
 
-    keyboard = [
+    if not update.message:
+        return
+
+
+    chat = update.effective_chat
+
+
+    # ==================================================
+    # GROUP
+    # ==================================================
+
+    if chat.type in ("group", "supergroup"):
+
+        await update.message.reply_text(
+            "📚 <b>আমল নামা Study Bot</b>\n\n"
+            "📖 /study 2\n"
+            "🏆 /leaderboard",
+            parse_mode="HTML"
+        )
+
+        return
+
+
+    # ==================================================
+    # PRIVATE
+    # ==================================================
+
+    # নিচের ৩টি বাটন সবসময় থাকবে
+    reply_keyboard = [
+        [
+            KeyboardButton("📚 Study"),
+            KeyboardButton("🏆 Leaderboard")
+        ],
+        [
+            KeyboardButton("👨‍💻 Developer")
+        ]
+    ]
+
+    reply_markup = ReplyKeyboardMarkup(
+        reply_keyboard,
+        resize_keyboard=True,
+        is_persistent=True
+    )
+
+
+    # ==================================================
+    # JOIN BUTTONS
+    # ==================================================
+
+    join_keyboard = [
         [
             InlineKeyboardButton(
-                "👥 Join Group",
+                "🤧 গ্রুপে জয়েন",
                 url="https://t.me/+ft6UwgnBRfhjZWFl"
             )
         ],
         [
             InlineKeyboardButton(
-                "📢 Join Channel",
+                "📢 চ্যানেলে জয়েন",
                 url="https://t.me/FixerZoneOfficial"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "✅ জয়েন করেছি",
+                callback_data="check_membership"
             )
         ]
     ]
 
-    text = (
-        "📚 <b>আমল নামা Study Bot</b>\n\n"
-        "Study time save করতে হলে আগে Group "
-        "ও Channel-এ Join করতে হবে।\n\n"
-        "তারপর ব্যবহার করুন:\n\n"
-        "📖 <code>/study 2</code>\n\n"
-        "🏆 <code>/leaderboard</code>\n\n"
-        "⚠️ একই দিনে যদি আবার /study দেন "
-        "তাহলে আগের সময় replace হবে।"
+
+    join_markup = InlineKeyboardMarkup(
+        join_keyboard
     )
+
+
+    text = (
+        "🔒 <b>বট ব্যবহার করতে হলে প্রথমে নিচের সবগুলোতে জয়েন করুন।</b>\n\n"
+        "জয়েন করার পর নিচের ✅ "
+        "\"জয়েন করেছি\" বাটনে ক্লিক করুন।"
+    )
+
 
     await update.message.reply_text(
         text,
         parse_mode="HTML",
-        reply_markup=InlineKeyboardMarkup(keyboard)
+        reply_markup=join_markup
     )
 
+
+    # নিচের Reply Keyboard আলাদা message হিসেবে পাঠানো হচ্ছে
+    await update.message.reply_text(
+        "👇 নিচের মেনু থেকে অপশন নির্বাচন করুন।",
+        reply_markup=reply_markup
+    )
 
 # ==================================================
 # /STUDY
