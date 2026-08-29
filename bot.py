@@ -211,20 +211,40 @@ async def check_membership(
 
 
 # ==================================================
-# /START
+# PRIVATE /START
 # ==================================================
 
-async def start(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
+allowed = await check_membership(
+    update,
+    context
+)
 
-    if not update.message:
-        return
+if not allowed:
+    return
 
 
-    chat = update.effective_chat
+reply_keyboard = [
+    [
+        KeyboardButton("📚 Study"),
+        KeyboardButton("🏆 Leaderboard")
+    ],
+    [
+        KeyboardButton("👨‍💻 Developer")
+    ]
+]
 
+reply_markup = ReplyKeyboardMarkup(
+    reply_keyboard,
+    resize_keyboard=True,
+    is_persistent=True
+)
+
+await update.message.reply_text(
+    "👋 <b>Welcome to Amol Nama Study Bot!</b>\n\n"
+    "👇 নিচের Menu থেকে অপশন নির্বাচন করুন।",
+    parse_mode="HTML",
+    reply_markup=reply_markup
+)
 
     # ==================================================
     # GROUP
@@ -395,10 +415,8 @@ async def study(
     if not context.args:
 
         await update.message.reply_text(
-            "❌ কত ঘণ্টা পড়েছেন লিখুন।\n\n"
-            "উদাহরণ:\n"
-            "<code>/study 2</code>\n"
-            "<code>/study 2.5</code>",
+            "📖 আজ কত ঘণ্টা পড়েছেন লিখুন।\n\n"
+            
             parse_mode="HTML"
         )
 
@@ -415,7 +433,6 @@ async def study(
 
         await update.message.reply_text(
             "❌ সঠিক সংখ্যা দিন।\n\n"
-            "উদাহরণ: <code>/study 3.5</code>",
             parse_mode="HTML"
         )
 
@@ -477,7 +494,7 @@ async def study(
         )
 
         await update.message.reply_text(
-            "⚠️ Study time save করতে সমস্যা হয়েছে।"
+            "⚠️ Api Call Failed"
         )
 
 
@@ -514,11 +531,7 @@ async def study_button(
 
     await update.message.reply_text(
         "📚 <b>Study Time</b>\n\n"
-        "আজ কত ঘণ্টা Study করেছেন?\n\n"
-        "উদাহরণ:\n"
-        "<code>2</code>\n"
-        "<code>2.5</code>\n"
-        "<code>3</code>",
+        "📖আজ কত ঘণ্টা Study করেছেন?\n\n"
         parse_mode="HTML"
     )
 
@@ -568,10 +581,6 @@ async def study_input(
 
         await update.message.reply_text(
             "⚠️ সঠিক সংখ্যা দিন।\n\n"
-            "উদাহরণ:\n"
-            "<code>2</code>\n"
-            "<code>2.5</code>\n"
-            "<code>3</code>",
             parse_mode="HTML"
         )
 
@@ -653,7 +662,7 @@ async def study_input(
         )
 
         await update.message.reply_text(
-            "⚠️ Study time save করতে সমস্যা হয়েছে।"
+            "⚠️ Api call Failed"
         )
 
 
@@ -817,7 +826,7 @@ async def leaderboard(
         )
 
         await update.message.reply_text(
-            "⚠️ Leaderboard দেখাতে সমস্যা হয়েছে।"
+            "⚠️ Api call Failed"
         )
 
 
