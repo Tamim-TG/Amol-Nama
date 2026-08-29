@@ -6,7 +6,14 @@ from zoneinfo import ZoneInfo
 from aiohttp import web
 from supabase import create_client, Client
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import (
+    Update,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    ReplyKeyboardMarkup,
+    KeyboardButton
+)
+
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -642,6 +649,24 @@ async def main():
     await start_health_server()
 
 
+    keyboard = [
+        [
+            KeyboardButton("📚 Study"),
+            KeyboardButton("🏆 Leaderboard")
+        ],
+        [
+            KeyboardButton("👨‍💻 Developer")
+        ]
+    ]
+
+
+    reply_markup = ReplyKeyboardMarkup(
+        keyboard,
+        resize_keyboard=True,
+        is_persistent=True
+    )
+
+
     application = (
         Application.builder()
         .token(BOT_TOKEN)
@@ -704,7 +729,6 @@ async def main():
         await application.updater.stop()
         await application.stop()
         await application.shutdown()
-
 
 # ==================================================
 # RUN
