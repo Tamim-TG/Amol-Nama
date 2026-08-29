@@ -18,6 +18,7 @@ from telegram.ext import (
     Application,
     CommandHandler,
     MessageHandler,
+    CallbackQueryHandler,
     ContextTypes,
     filters,
 )
@@ -88,9 +89,17 @@ async def check_membership(
         return False
 
 
-    # --------------------------
+    # Message location
+    message = update.message
+
+    # Callback location
+    if not message and update.callback_query:
+        message = update.callback_query.message
+
+
+    # ==================================================
     # GROUP CHECK
-    # --------------------------
+    # ==================================================
 
     try:
 
@@ -114,11 +123,15 @@ async def check_membership(
             ]
 
 
-            await update.message.reply_text(
-                "❌ আগে Group-এ Join করুন।\n\n"
-                "Join করার পর আবার command দিন।",
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
+            if message:
+
+                await message.reply_text(
+                    "❌ আগে Group-এ Join করুন।\n\n"
+                    "Join করার পর আবার চেষ্টা করুন।",
+                    reply_markup=InlineKeyboardMarkup(
+                        keyboard
+                    )
+                )
 
             return False
 
@@ -130,16 +143,18 @@ async def check_membership(
             e
         )
 
-        await update.message.reply_text(
-            "⚠️ Group membership check করা যাচ্ছে না।"
-        )
+        if message:
+
+            await message.reply_text(
+                "⚠️ Group membership check করা যাচ্ছে না।"
+            )
 
         return False
 
 
-    # --------------------------
+    # ==================================================
     # CHANNEL CHECK
-    # --------------------------
+    # ==================================================
 
     try:
 
@@ -163,11 +178,15 @@ async def check_membership(
             ]
 
 
-            await update.message.reply_text(
-                "❌ আগে Channel-এ Join করুন।\n\n"
-                "Join করার পর আবার command দিন।",
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
+            if message:
+
+                await message.reply_text(
+                    "❌ আগে Channel-এ Join করুন।\n\n"
+                    "Join করার পর আবার চেষ্টা করুন।",
+                    reply_markup=InlineKeyboardMarkup(
+                        keyboard
+                    )
+                )
 
             return False
 
@@ -179,9 +198,11 @@ async def check_membership(
             e
         )
 
-        await update.message.reply_text(
-            "⚠️ Channel membership check করা যাচ্ছে না।"
-        )
+        if message:
+
+            await message.reply_text(
+                "⚠️ Channel membership check করা যাচ্ছে না।"
+            )
 
         return False
 
@@ -209,7 +230,10 @@ async def start(
     # GROUP
     # ==================================================
 
-    if chat.type in ("group", "supergroup"):
+    if chat.type in (
+        "group",
+        "supergroup"
+    ):
 
         await update.message.reply_text(
             "📚 <b>আমল নামা Study Bot</b>\n\n"
@@ -295,7 +319,7 @@ async def start(
 
 
 # ==================================================
-# MEMBERSHIP BUTTON
+# JOIN / VERIFY BUTTON
 # ==================================================
 
 async def check_membership_button(
@@ -312,10 +336,6 @@ async def check_membership_button(
     await query.answer()
 
 
-    if not query.message:
-        return
-
-
     allowed = await check_membership(
         update,
         context
@@ -326,15 +346,17 @@ async def check_membership_button(
         return
 
 
-    await query.message.reply_text(
-        "✅ <b>Membership verified!</b>\n\n"
-        "এখন নিচের Menu থেকে Study ব্যবহার করতে পারবেন।",
-        parse_mode="HTML"
-    )
+    if query.message:
+
+        await query.message.reply_text(
+            "✅ <b>Membership verified!</b>\n\n"
+            "এখন নিচের Menu থেকে Study ব্যবহার করতে পারবেন।",
+            parse_mode="HTML"
+        )
 
 
 # ==================================================
-# /STUDY
+# /STUDY — GROUP
 # ==================================================
 
 async def study(
@@ -346,15 +368,11 @@ async def study(
         return
 
 
-    if not update.effective_user:
-        return
-
-
-    # Group only
     if update.effective_chat.type not in (
         "group",
         "supergroup"
     ):
+
         await update.message.reply_text(
             "📚 Private chat-এ নিচের "
             "📚 Study button ব্যবহার করুন।"
@@ -363,7 +381,10 @@ async def study(
         return
 
 
-    # Membership check
+    # ==================================================
+    # MEMBERSHIP CHECK
+    # ==================================================
+
     allowed = await check_membership(
         update,
         context
@@ -374,9 +395,9 @@ async def study(
         return
 
 
-    # --------------------------
+    # ==================================================
     # ARGUMENT CHECK
-    # --------------------------
+    # ==================================================
 
     if not context.args:
 
@@ -419,17 +440,15 @@ async def study(
 
 
     user = update.effective_user
-    chat = update.effective_chat
-
     study_date = today()
 
 
-    # --------------------------
-    # SAVE / REPLACE
-    # --------------------------
+    # ==================================================
+    # GROUP STUDY SAVE
+    # ==================================================
 
     data = {
-        "chat_id": chat.id,
+        "chat_id": GROUP_ID,
         "user_id": user.id,
         "username": user.username or "",
         "full_name": user.full_name,
@@ -470,7 +489,7 @@ async def study(
 
 
 # ==================================================
-# STUDY BUTTON
+# STUDY BUTTON — PRIVATE
 # ==================================================
 
 async def study_button(
@@ -486,7 +505,10 @@ async def study_button(
         return
 
 
-    # Membership check
+    # ==================================================
+    # MEMBERSHIP CHECK
+    # ==================================================
+
     allowed = await check_membership(
         update,
         context
@@ -514,7 +536,7 @@ async def study_button(
 
 
 # ==================================================
-# STUDY TIME INPUT
+# STUDY NUMBER INPUT — PRIVATE
 # ==================================================
 
 async def study_input(
@@ -536,33 +558,47 @@ async def study_input(
         return
 
 
+    text = update.message.text
+
+
+    if not text:
+        return
+
+
     try:
 
         hours = float(
-            update.message.text.strip()
+            text.strip()
         )
 
-        if hours <= 0 or hours > 24:
-            raise ValueError
-
-
-    except (
-        ValueError,
-        AttributeError
-    ):
+    except ValueError:
 
         await update.message.reply_text(
             "⚠️ সঠিক সংখ্যা দিন।\n\n"
-            "উদাহরণ: <code>2</code> "
-            "অথবা <code>2.5</code>\n\n"
-            "সর্বোচ্চ 24 ঘণ্টা।",
+            "উদাহরণ:\n"
+            "<code>2</code>\n"
+            "<code>2.5</code>\n"
+            "<code>3</code>",
             parse_mode="HTML"
         )
 
         return
 
 
-    # Membership check
+    if hours <= 0 or hours > 24:
+
+        await update.message.reply_text(
+            "❌ সময় 0-এর বেশি এবং "
+            "সর্বোচ্চ 24 ঘণ্টা হতে হবে।"
+        )
+
+        return
+
+
+    # ==================================================
+    # MEMBERSHIP CHECK
+    # ==================================================
+
     allowed = await check_membership(
         update,
         context
@@ -574,13 +610,16 @@ async def study_input(
 
 
     user = update.effective_user
-    chat = update.effective_chat
-
     study_date = today()
 
 
+    # ==================================================
+    # IMPORTANT:
+    # PRIVATE STUDY ALSO GOES TO GROUP
+    # ==================================================
+
     data = {
-        "chat_id": chat.id,
+        "chat_id": GROUP_ID,
         "user_id": user.id,
         "username": user.username or "",
         "full_name": user.full_name,
@@ -616,7 +655,7 @@ async def study_input(
     except Exception as e:
 
         print(
-            "Study button save error:",
+            "Private study save error:",
             e
         )
 
@@ -660,7 +699,7 @@ def get_leaderboard(
 
 
 # ==================================================
-# /LEADERBOARD
+# /LEADERBOARD — GROUP
 # ==================================================
 
 async def leaderboard(
@@ -672,6 +711,23 @@ async def leaderboard(
         return
 
 
+    if update.effective_chat.type not in (
+        "group",
+        "supergroup"
+    ):
+
+        # Private হলে একই Group leaderboard দেখাবে
+        chat_id = GROUP_ID
+
+    else:
+
+        chat_id = GROUP_ID
+
+
+    # ==================================================
+    # MEMBERSHIP CHECK
+    # ==================================================
+
     allowed = await check_membership(
         update,
         context
@@ -682,7 +738,6 @@ async def leaderboard(
         return
 
 
-    chat_id = update.effective_chat.id
     study_date = today()
 
 
@@ -733,8 +788,11 @@ async def leaderboard(
 
 
             if index < 3:
+
                 position = medals[index]
+
             else:
+
                 position = f"{index + 1}."
 
 
@@ -771,7 +829,7 @@ async def leaderboard(
 
 
 # ==================================================
-# LEADERBOARD BUTTON
+# LEADERBOARD BUTTON — PRIVATE
 # ==================================================
 
 async def leaderboard_button(
@@ -812,7 +870,7 @@ async def developer_button(
 
     await update.message.reply_text(
         "👨‍💻 <b>Developer</b>\n\n"
-        "Amol Nama Study Bot\n\n"
+        "📚 Amol Nama Study Bot\n\n"
         "Developer information coming soon.",
         parse_mode="HTML"
     )
@@ -839,10 +897,10 @@ async def send_yesterday_leaderboards(
         )
 
 
-        chat_ids = set(
-            row["chat_id"]
-            for row in (groups.data or [])
-        )
+        # শুধু GROUP_ID-এর leaderboard
+        chat_ids = {
+            GROUP_ID
+        }
 
 
         for chat_id in chat_ids:
@@ -888,8 +946,11 @@ async def send_yesterday_leaderboards(
 
 
                     if index < 3:
+
                         position = medals[index]
+
                     else:
+
                         position = f"{index + 1}."
 
 
@@ -951,11 +1012,9 @@ async def midnight_loop(
         try:
 
             now = bd_now()
-
             current_date = now.date()
 
 
-            # রাত ১২টা
             if (
                 now.hour == 0
                 and now.minute == 0
@@ -1017,6 +1076,7 @@ async def start_health_server():
         app
     )
 
+
     await runner.setup()
 
 
@@ -1051,9 +1111,9 @@ async def main():
     )
 
 
-    # --------------------------
-    # COMMANDS
-    # --------------------------
+    # ==================================================
+    # COMMAND HANDLERS
+    # ==================================================
 
     application.add_handler(
         CommandHandler(
@@ -1079,9 +1139,21 @@ async def main():
     )
 
 
-    # --------------------------
+    # ==================================================
+    # CALLBACK HANDLER
+    # ==================================================
+
+    application.add_handler(
+        CallbackQueryHandler(
+            check_membership_button,
+            pattern="^check_membership$"
+        )
+    )
+
+
+    # ==================================================
     # PRIVATE BUTTONS
-    # --------------------------
+    # ==================================================
 
     application.add_handler(
         MessageHandler(
@@ -1107,9 +1179,9 @@ async def main():
     )
 
 
-    # --------------------------
-    # STUDY NUMBER INPUT
-    # --------------------------
+    # ==================================================
+    # PRIVATE STUDY NUMBER INPUT
+    # ==================================================
 
     application.add_handler(
         MessageHandler(
@@ -1119,15 +1191,9 @@ async def main():
     )
 
 
-    # --------------------------
-    # JOIN CHECK BUTTON
-    # --------------------------
-
-    application.add_handler(
-        # Callback handler is registered below
-        # through the imported telegram.ext class
-    )
-
+    # ==================================================
+    # START BOT
+    # ==================================================
 
     await application.initialize()
 
@@ -1152,6 +1218,7 @@ async def main():
     try:
 
         while True:
+
             await asyncio.sleep(3600)
 
 
