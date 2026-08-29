@@ -1053,6 +1053,20 @@ async def private_text_handler(
 
     text = update.message.text
 
+        # ----------------------------------------------
+    # Developer Reply
+    # ----------------------------------------------
+
+    if context.user_data.get(
+        "reply_to_user"
+    ):
+
+        await send_dev_reply(
+            update,
+            context
+        )
+
+        return
     # ----------------------------------------------
     # Waiting for study number
     # ----------------------------------------------
@@ -1326,11 +1340,52 @@ async def main():
 
     application.add_handler(
         MessageHandler(
-            filters.TEXT
-            & ~filters.COMMAND,
+            filters.Regex("^📚 Study$"),
+            study_button
+        )
+    )
+
+    application.add_handler(
+        MessageHandler(
+            filters.Regex("^🏆 Leaderboard$"),
+            leaderboard_button
+        )
+    )
+
+    application.add_handler(
+        MessageHandler(
+            filters.Regex("^👨‍💻 Developer$"),
+            developer_button
+        )
+    )
+
+    # Study number input + Developer reply
+    application.add_handler(
+        MessageHandler(
+            filters.TEXT & ~filters.COMMAND,
             private_text_handler
         )
     )
+
+    # ----------------------------------------------
+    # Developer callbacks
+    # ----------------------------------------------
+
+    application.add_handler(
+        CallbackQueryHandler(
+            contact_dev,
+            pattern="^contact_dev$"
+        )
+    )
+
+    application.add_handler(
+        CallbackQueryHandler(
+            reply_to_user,
+            pattern="^reply_user:"
+        )
+    )
+
+    await application.initialize()
 
     await application.initialize()
 
