@@ -308,7 +308,7 @@ async def study(
     if not allowed:
         return
 
-    # ==================================================
+# ==================================================
 # STUDY BUTTON
 # ==================================================
 
@@ -321,6 +321,15 @@ async def study_button(
         return
 
     if update.effective_chat.type != "private":
+        return
+
+    # Membership check
+    allowed = await check_membership(
+        update,
+        context
+    )
+
+    if not allowed:
         return
 
     await update.message.reply_text(
