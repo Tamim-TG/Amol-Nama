@@ -795,6 +795,12 @@ async def main():
         )
     )
 
+    application.add_handler(
+    MessageHandler(
+        filters.Regex("^📚 Study$"),
+        study_button
+    )
+)
 
     await application.initialize()
 
