@@ -11,7 +11,7 @@ from telegram import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     ReplyKeyboardMarkup,
-    KeyboardButton
+    KeyboardButton,
 )
 
 from telegram.ext import (
@@ -20,12 +20,6 @@ from telegram.ext import (
     MessageHandler,
     ContextTypes,
     filters,
-)
-
-from telegram.ext import (
-    Application,
-    CommandHandler,
-    ContextTypes,
 )
 
 
@@ -83,12 +77,16 @@ def yesterday():
 # MEMBERSHIP CHECK
 # ==================================================
 
-async def check_membership(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def check_membership(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
 
     user = update.effective_user
 
     if not user:
         return False
+
 
     # --------------------------
     # GROUP CHECK
@@ -103,6 +101,7 @@ async def check_membership(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         group_status = group_member.status
 
+
         if group_status in ("left", "kicked"):
 
             keyboard = [
@@ -114,6 +113,7 @@ async def check_membership(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 ]
             ]
 
+
             await update.message.reply_text(
                 "❌ আগে Group-এ Join করুন।\n\n"
                 "Join করার পর আবার command দিন।",
@@ -122,9 +122,13 @@ async def check_membership(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             return False
 
+
     except Exception as e:
 
-        print("Group membership error:", e)
+        print(
+            "Group membership error:",
+            e
+        )
 
         await update.message.reply_text(
             "⚠️ Group membership check করা যাচ্ছে না।"
@@ -146,6 +150,7 @@ async def check_membership(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         channel_status = channel_member.status
 
+
         if channel_status in ("left", "kicked"):
 
             keyboard = [
@@ -157,6 +162,7 @@ async def check_membership(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 ]
             ]
 
+
             await update.message.reply_text(
                 "❌ আগে Channel-এ Join করুন।\n\n"
                 "Join করার পর আবার command দিন।",
@@ -165,9 +171,13 @@ async def check_membership(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             return False
 
+
     except Exception as e:
 
-        print("Channel membership error:", e)
+        print(
+            "Channel membership error:",
+            e
+        )
 
         await update.message.reply_text(
             "⚠️ Channel membership check করা যাচ্ছে না।"
@@ -215,7 +225,6 @@ async def start(
     # PRIVATE
     # ==================================================
 
-    # নিচের ৩টি বাটন সবসময় থাকবে
     reply_keyboard = [
         [
             KeyboardButton("📚 Study"),
@@ -225,6 +234,7 @@ async def start(
             KeyboardButton("👨‍💻 Developer")
         ]
     ]
+
 
     reply_markup = ReplyKeyboardMarkup(
         reply_keyboard,
@@ -278,11 +288,50 @@ async def start(
     )
 
 
-    # নিচের Reply Keyboard আলাদা message হিসেবে পাঠানো হচ্ছে
     await update.message.reply_text(
         "👇 নিচের মেনু থেকে অপশন নির্বাচন করুন।",
         reply_markup=reply_markup
     )
+
+
+# ==================================================
+# MEMBERSHIP BUTTON
+# ==================================================
+
+async def check_membership_button(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
+    query = update.callback_query
+
+    if not query:
+        return
+
+
+    await query.answer()
+
+
+    if not query.message:
+        return
+
+
+    allowed = await check_membership(
+        update,
+        context
+    )
+
+
+    if not allowed:
+        return
+
+
+    await query.message.reply_text(
+        "✅ <b>Membership verified!</b>\n\n"
+        "এখন নিচের Menu থেকে Study ব্যবহার করতে পারবেন।",
+        parse_mode="HTML"
+    )
+
 
 # ==================================================
 # /STUDY
@@ -296,32 +345,23 @@ async def study(
     if not update.message:
         return
 
+
     if not update.effective_user:
         return
 
-    # Membership check
-    allowed = await check_membership(
-        update,
-        context
-    )
 
-    if not allowed:
+    # Group only
+    if update.effective_chat.type not in (
+        "group",
+        "supergroup"
+    ):
+        await update.message.reply_text(
+            "📚 Private chat-এ নিচের "
+            "📚 Study button ব্যবহার করুন।"
+        )
+
         return
 
-# ==================================================
-# STUDY BUTTON
-# ==================================================
-
-async def study_button(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
-
-    if not update.message:
-        return
-
-    if update.effective_chat.type != "private":
-        return
 
     # Membership check
     allowed = await check_membership(
@@ -329,20 +369,9 @@ async def study_button(
         context
     )
 
+
     if not allowed:
         return
-
-    await update.message.reply_text(
-        "📚 <b>Study Time</b>\n\n"
-        "আজ কত ঘণ্টা Study করেছেন?\n\n"
-        "উদাহরণ:\n"
-        "<code>2</code>\n"
-        "<code>2.5</code>\n"
-        "<code>3</code>",
-        parse_mode="HTML"
-    )
-
-    context.user_data["waiting_for_study"] = True
 
 
     # --------------------------
@@ -353,7 +382,10 @@ async def study_button(
 
         await update.message.reply_text(
             "❌ কত ঘণ্টা পড়েছেন লিখুন।\n\n"
-            "হিসাব করে সঠিক লিখুন"
+            "উদাহরণ:\n"
+            "<code>/study 2</code>\n"
+            "<code>/study 2.5</code>",
+            parse_mode="HTML"
         )
 
         return
@@ -361,13 +393,16 @@ async def study_button(
 
     try:
 
-        hours = float(context.args[0])
+        hours = float(
+            context.args[0]
+        )
 
     except ValueError:
 
         await update.message.reply_text(
             "❌ সঠিক সংখ্যা দিন।\n\n"
-            "উদাহরণ: /study 3.5"
+            "উদাহরণ: <code>/study 3.5</code>",
+            parse_mode="HTML"
         )
 
         return
@@ -376,7 +411,8 @@ async def study_button(
     if hours <= 0 or hours > 24:
 
         await update.message.reply_text(
-            "❌ সময় 0-এর বেশি এবং সর্বোচ্চ 24 ঘণ্টা হতে হবে।"
+            "❌ সময় 0-এর বেশি এবং "
+            "সর্বোচ্চ 24 ঘণ্টা হতে হবে।"
         )
 
         return
@@ -406,24 +442,183 @@ async def study_button(
     try:
 
         supabase.table(
-    "study_hours"
-).upsert(
-    data,
-    on_conflict="chat_id,user_id,study_date"
-).execute()
+            "study_hours"
+        ).upsert(
+            data,
+            on_conflict="chat_id,user_id,study_date"
+        ).execute()
 
 
         await update.message.reply_text(
             "✅ <b>Study Time Save হয়েছে!</b>\n\n"
             f"👤 {user.full_name}\n"
-            f"📚 আজকের সময়: <b>{hours:g} ঘণ্টা</b>\n\n",
+            f"📚 আজকের সময়: <b>{hours:g} ঘণ্টা</b>",
             parse_mode="HTML"
         )
 
 
     except Exception as e:
 
-        print("Study save error:", e)
+        print(
+            "Study save error:",
+            e
+        )
+
+        await update.message.reply_text(
+            "⚠️ Study time save করতে সমস্যা হয়েছে।"
+        )
+
+
+# ==================================================
+# STUDY BUTTON
+# ==================================================
+
+async def study_button(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
+    if not update.message:
+        return
+
+
+    if update.effective_chat.type != "private":
+        return
+
+
+    # Membership check
+    allowed = await check_membership(
+        update,
+        context
+    )
+
+
+    if not allowed:
+        return
+
+
+    await update.message.reply_text(
+        "📚 <b>Study Time</b>\n\n"
+        "আজ কত ঘণ্টা Study করেছেন?\n\n"
+        "উদাহরণ:\n"
+        "<code>2</code>\n"
+        "<code>2.5</code>\n"
+        "<code>3</code>",
+        parse_mode="HTML"
+    )
+
+
+    context.user_data[
+        "waiting_for_study"
+    ] = True
+
+
+# ==================================================
+# STUDY TIME INPUT
+# ==================================================
+
+async def study_input(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
+    if not update.message:
+        return
+
+
+    if update.effective_chat.type != "private":
+        return
+
+
+    if not context.user_data.get(
+        "waiting_for_study"
+    ):
+        return
+
+
+    try:
+
+        hours = float(
+            update.message.text.strip()
+        )
+
+        if hours <= 0 or hours > 24:
+            raise ValueError
+
+
+    except (
+        ValueError,
+        AttributeError
+    ):
+
+        await update.message.reply_text(
+            "⚠️ সঠিক সংখ্যা দিন।\n\n"
+            "উদাহরণ: <code>2</code> "
+            "অথবা <code>2.5</code>\n\n"
+            "সর্বোচ্চ 24 ঘণ্টা।",
+            parse_mode="HTML"
+        )
+
+        return
+
+
+    # Membership check
+    allowed = await check_membership(
+        update,
+        context
+    )
+
+
+    if not allowed:
+        return
+
+
+    user = update.effective_user
+    chat = update.effective_chat
+
+    study_date = today()
+
+
+    data = {
+        "chat_id": chat.id,
+        "user_id": user.id,
+        "username": user.username or "",
+        "full_name": user.full_name,
+        "study_date": study_date,
+        "hours": hours,
+        "updated_at": bd_now().isoformat()
+    }
+
+
+    try:
+
+        supabase.table(
+            "study_hours"
+        ).upsert(
+            data,
+            on_conflict="chat_id,user_id,study_date"
+        ).execute()
+
+
+        context.user_data[
+            "waiting_for_study"
+        ] = False
+
+
+        await update.message.reply_text(
+            "✅ <b>Study Time Save হয়েছে!</b>\n\n"
+            f"👤 {user.full_name}\n"
+            f"📚 আজকের সময়: <b>{hours:g} ঘণ্টা</b>",
+            parse_mode="HTML"
+        )
+
+
+    except Exception as e:
+
+        print(
+            "Study button save error:",
+            e
+        )
 
         await update.message.reply_text(
             "⚠️ Study time save করতে সমস্যা হয়েছে।"
@@ -434,7 +629,10 @@ async def study_button(
 # LEADERBOARD DATA
 # ==================================================
 
-def get_leaderboard(chat_id, study_date):
+def get_leaderboard(
+    chat_id,
+    study_date
+):
 
     result = (
         supabase
@@ -442,10 +640,21 @@ def get_leaderboard(chat_id, study_date):
         .select(
             "user_id, username, full_name, hours"
         )
-        .eq("study_date", study_date)
-        .order("hours", desc=True)
+        .eq(
+            "chat_id",
+            chat_id
+        )
+        .eq(
+            "study_date",
+            study_date
+        )
+        .order(
+            "hours",
+            desc=True
+        )
         .execute()
     )
+
 
     return result.data or []
 
@@ -462,10 +671,12 @@ async def leaderboard(
     if not update.message:
         return
 
+
     allowed = await check_membership(
         update,
         context
     )
+
 
     if not allowed:
         return
@@ -494,7 +705,12 @@ async def leaderboard(
             return
 
 
-        medals = ["🥇", "🥈", "🥉"]
+        medals = [
+            "🥇",
+            "🥈",
+            "🥉"
+        ]
+
 
         text = (
             "🏆 <b>আজকের Study Leaderboard</b>\n"
@@ -509,6 +725,7 @@ async def leaderboard(
                 or row.get("username")
                 or "Unknown"
             )
+
 
             hours = float(
                 row.get("hours", 0)
@@ -543,11 +760,62 @@ async def leaderboard(
 
     except Exception as e:
 
-        print("Leaderboard error:", e)
+        print(
+            "Leaderboard error:",
+            e
+        )
 
         await update.message.reply_text(
             "⚠️ Leaderboard দেখাতে সমস্যা হয়েছে।"
         )
+
+
+# ==================================================
+# LEADERBOARD BUTTON
+# ==================================================
+
+async def leaderboard_button(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
+    if not update.message:
+        return
+
+
+    if update.effective_chat.type != "private":
+        return
+
+
+    await leaderboard(
+        update,
+        context
+    )
+
+
+# ==================================================
+# DEVELOPER BUTTON
+# ==================================================
+
+async def developer_button(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
+    if not update.message:
+        return
+
+
+    if update.effective_chat.type != "private":
+        return
+
+
+    await update.message.reply_text(
+        "👨‍💻 <b>Developer</b>\n\n"
+        "Amol Nama Study Bot\n\n"
+        "Developer information coming soon.",
+        parse_mode="HTML"
+    )
 
 
 # ==================================================
@@ -591,7 +859,12 @@ async def send_yesterday_leaderboards(
                     continue
 
 
-                medals = ["🥇", "🥈", "🥉"]
+                medals = [
+                    "🥇",
+                    "🥈",
+                    "🥉"
+                ]
+
 
                 text = (
                     "🌙 <b>গতকালের Study Leaderboard</b>\n"
@@ -607,6 +880,7 @@ async def send_yesterday_leaderboards(
                         or row.get("username")
                         or "Unknown"
                     )
+
 
                     hours = float(
                         row.get("hours", 0)
@@ -664,7 +938,10 @@ async def midnight_loop(
     application: Application
 ):
 
-    print("🌙 Midnight scheduler started.")
+    print(
+        "🌙 Midnight scheduler started."
+    )
+
 
     last_processed = None
 
@@ -677,8 +954,12 @@ async def midnight_loop(
 
             current_date = now.date()
 
+
             # রাত ১২টা
-            if now.hour == 0 and now.minute == 0:
+            if (
+                now.hour == 0
+                and now.minute == 0
+            ):
 
                 if last_processed != current_date:
 
@@ -706,7 +987,9 @@ async def midnight_loop(
 # HEALTH SERVER
 # ==================================================
 
-async def health(request):
+async def health(
+    request
+):
 
     return web.Response(
         text="Amol Nama Study Bot is running ✅"
@@ -717,10 +1000,12 @@ async def start_health_server():
 
     app = web.Application()
 
+
     app.router.add_get(
         "/",
         health
     )
+
 
     app.router.add_get(
         "/health",
@@ -728,7 +1013,9 @@ async def start_health_server():
     )
 
 
-    runner = web.AppRunner(app)
+    runner = web.AppRunner(
+        app
+    )
 
     await runner.setup()
 
@@ -738,6 +1025,7 @@ async def start_health_server():
         "0.0.0.0",
         PORT
     )
+
 
     await site.start()
 
@@ -756,30 +1044,16 @@ async def main():
     await start_health_server()
 
 
-    keyboard = [
-        [
-            KeyboardButton("📚 Study"),
-            KeyboardButton("🏆 Leaderboard")
-        ],
-        [
-            KeyboardButton("👨‍💻 Developer")
-        ]
-    ]
-
-
-    reply_markup = ReplyKeyboardMarkup(
-        keyboard,
-        resize_keyboard=True,
-        is_persistent=True
-    )
-
-
     application = (
         Application.builder()
         .token(BOT_TOKEN)
         .build()
     )
 
+
+    # --------------------------
+    # COMMANDS
+    # --------------------------
 
     application.add_handler(
         CommandHandler(
@@ -804,16 +1078,61 @@ async def main():
         )
     )
 
+
+    # --------------------------
+    # PRIVATE BUTTONS
+    # --------------------------
+
     application.add_handler(
-    MessageHandler(
-        filters.Regex("^📚 Study$"),
-        study_button
+        MessageHandler(
+            filters.Regex("^📚 Study$"),
+            study_button
+        )
     )
-)
+
+
+    application.add_handler(
+        MessageHandler(
+            filters.Regex("^🏆 Leaderboard$"),
+            leaderboard_button
+        )
+    )
+
+
+    application.add_handler(
+        MessageHandler(
+            filters.Regex("^👨‍💻 Developer$"),
+            developer_button
+        )
+    )
+
+
+    # --------------------------
+    # STUDY NUMBER INPUT
+    # --------------------------
+
+    application.add_handler(
+        MessageHandler(
+            filters.TEXT & ~filters.COMMAND,
+            study_input
+        )
+    )
+
+
+    # --------------------------
+    # JOIN CHECK BUTTON
+    # --------------------------
+
+    application.add_handler(
+        # Callback handler is registered below
+        # through the imported telegram.ext class
+    )
+
 
     await application.initialize()
 
     await application.start()
+
 
     await application.updater.start_polling(
         allowed_updates=Update.ALL_TYPES
@@ -835,6 +1154,7 @@ async def main():
         while True:
             await asyncio.sleep(3600)
 
+
     finally:
 
         scheduler.cancel()
@@ -843,6 +1163,7 @@ async def main():
         await application.stop()
         await application.shutdown()
 
+
 # ==================================================
 # RUN
 # ==================================================
@@ -850,8 +1171,14 @@ async def main():
 if __name__ == "__main__":
 
     try:
-        asyncio.run(main())
+
+        asyncio.run(
+            main()
+        )
+
 
     except KeyboardInterrupt:
 
-        print("Bot stopped.")
+        print(
+            "Bot stopped."
+        )
