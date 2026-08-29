@@ -308,6 +308,33 @@ async def study(
     if not allowed:
         return
 
+    # ==================================================
+# STUDY BUTTON
+# ==================================================
+
+async def study_button(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
+    if not update.message:
+        return
+
+    if update.effective_chat.type != "private":
+        return
+
+    await update.message.reply_text(
+        "📚 <b>Study Time</b>\n\n"
+        "আজ কত ঘণ্টা Study করেছেন?\n\n"
+        "উদাহরণ:\n"
+        "<code>2</code>\n"
+        "<code>2.5</code>\n"
+        "<code>3</code>",
+        parse_mode="HTML"
+    )
+
+    context.user_data["waiting_for_study"] = True
+
 
     # --------------------------
     # ARGUMENT CHECK
