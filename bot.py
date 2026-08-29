@@ -1,5 +1,6 @@
 import os
 import asyncio
+from html import escape
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -9,7 +10,6 @@ from supabase import create_client, Client
 from telegram import (
     Update,
     ReplyKeyboardMarkup,
-    InlineKeyboardButton,
     InlineKeyboardMarkup,
 )
 from telegram.ext import (
@@ -32,6 +32,7 @@ SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
 
 GROUP_ID = int(os.getenv("GROUP_ID", "0"))
+DEV_CHAT_ID = int(os.getenv("DEV_CHAT_ID", "0"))
 
 supabase: Client = create_client(
     SUPABASE_URL,
@@ -216,6 +217,9 @@ async def send_join_menu(
             "📢 চ্যানেলে জয়েন"
         ],
         [
+            "📣 ফেসবুক বট চ্যানেলে জয়েন"
+        ],
+        [
             "✅ জয়েন করেছি"
         ]
     ]
@@ -376,20 +380,22 @@ async def developer_button(
     if update.effective_chat.type != "private":
         return
 
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                "💬 Contact Dev",
+                callback_data="contact_dev"
+            )
+        ]
+    ]
+
     await update.message.reply_text(
         "👨‍💻 <b>Developer</b>\n\n"
-        "কোনো সমস্যা বা প্রয়োজন হলে নিচের button চাপুন।",
+        "কোনো সমস্যা বা প্রয়োজন হলে "
+        "Developer-এর সাথে যোগাযোগ করুন।",
         parse_mode="HTML",
-        reply_markup=InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton(
-                    "💬 Contact Dev",
-                    callback_data="contact_dev"
-                )
-            ]
-        ])
+        reply_markup=InlineKeyboardMarkup(keyboard)
     )
-
 
 # ==================================================
 # CONTACT DEVELOPER
@@ -402,13 +408,14 @@ async def contact_dev(
 
     query = update.callback_query
 
-    if not query or not query.from_user:
+    if not query:
         return
 
     await query.answer()
 
     user = query.from_user
-    dev_chat_id = int(os.getenv("DEV_CHAT_ID", "0"))
+
+    dev_chat_id = DEV_CHAT_ID
 
     if not dev_chat_id:
         await query.message.reply_text(
@@ -416,24 +423,20 @@ async def contact_dev(
         )
         return
 
-    # Contact Dev চাপলে Developer conversation শুরু হবে।
-    # Study input state বন্ধ করা হবে যাতে User-এর message
-    # আর study number হিসেবে ধরা না হয়।
-    context.user_data["dev_active"] = True
-    context.user_data["waiting_for_study"] = False
-
     text = (
         "📩 <b>New Developer Contact</b>\n\n"
-        f"👤 <b>Name:</b> {user.full_name}\n"
+        f"👤 <b>Name:</b> {escape(user.full_name)}\n"
         f"🆔 <b>User ID:</b> <code>{user.id}</code>\n"
     )
 
     if user.username:
-        text += f"🔗 <b>Username:</b> @{user.username}\n"
+        text += (
+            f"🔗 <b>Username:</b> @{escape(user.username)}\n"
+        )
 
     text += (
-        "\n💬 User এখন Developer-এর সাথে active conversation-এ আছে।\n"
-        "User-এর পরের message automatically এখানে আসবে।"
+        "\n💬 এই User-কে Reply করতে নিচের "
+        "button ব্যবহার করুন।"
     )
 
     keyboard = [
@@ -441,37 +444,23 @@ async def contact_dev(
             InlineKeyboardButton(
                 "💬 Reply",
                 callback_data=f"reply_user:{user.id}"
-            ),
-            InlineKeyboardButton(
-                "⛔ Stop",
-                callback_data=f"stop_dev:{user.id}"
             )
         ]
     ]
 
-    try:
-        await context.bot.send_message(
-            chat_id=dev_chat_id,
-            text=text,
-            parse_mode="HTML",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
+    await context.bot.send_message(
+        chat_id=dev_chat_id,
+        text=text,
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
 
-        await query.message.reply_text(
-            "✅ <b>Developer Contact active হয়েছে।</b>\n\n"
-            "এখন আপনার পরের message automatically Developer-এর কাছে যাবে।\n"
-            "Developer conversation বন্ধ করলে আবার স্বাভাবিক menu ব্যবহার করতে পারবেন।",
-            parse_mode="HTML",
-            reply_markup=get_main_keyboard()
-        )
-
-    except Exception as e:
-        print("Contact developer error:", e)
-        context.user_data["dev_active"] = False
-        await query.message.reply_text(
-            "⚠️ Developer-এর কাছে যোগাযোগের message পাঠানো যায়নি।"
-        )
-
+    await query.message.reply_text(
+        "✅ <b>Developer-এর কাছে আপনার "
+        "যোগাযোগের অনুরোধ পাঠানো হয়েছে।</b>\n\n"
+        "Developer প্রয়োজন হলে আপনাকে reply করবেন।",
+        parse_mode="HTML"
+    )
 
 # ==================================================
 # REPLY TO USER
@@ -484,74 +473,27 @@ async def reply_to_user(
 
     query = update.callback_query
 
-    if not query or not query.from_user:
+    if not query:
         return
 
     await query.answer()
 
-    dev_chat_id = int(os.getenv("DEV_CHAT_ID", "0"))
-
-    if not dev_chat_id or query.from_user.id != dev_chat_id:
+    if DEV_CHAT_ID and (
+        not query.message
+        or query.message.chat_id != DEV_CHAT_ID
+    ):
         return
 
-    try:
-        user_id = int(query.data.split(":", 1)[1])
-    except (ValueError, IndexError, AttributeError):
-        return
+    user_id = query.data.split(":")[1]
 
-    context.user_data["reply_to_user"] = user_id
+    context.user_data["reply_to_user"] = int(user_id)
 
     await query.message.reply_text(
         "✍️ <b>আপনার Reply লিখুন:</b>\n\n"
-        "যে text পাঠাবেন, সেটাই User-এর কাছে Developer reply হিসেবে যাবে।",
+        "যে message পাঠাবেন, সেটাই User-এর কাছে "
+        "Developer-এর reply হিসেবে যাবে।",
         parse_mode="HTML"
     )
-
-
-# ==================================================
-# STOP DEVELOPER CONVERSATION
-# ==================================================
-
-async def stop_dev(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
-
-    query = update.callback_query
-
-    if not query or not query.from_user:
-        return
-
-    await query.answer()
-
-    dev_chat_id = int(os.getenv("DEV_CHAT_ID", "0"))
-
-    if not dev_chat_id or query.from_user.id != dev_chat_id:
-        return
-
-    try:
-        user_id = int(query.data.split(":", 1)[1])
-    except (ValueError, IndexError, AttributeError):
-        return
-
-    try:
-        await context.bot.send_message(
-            chat_id=user_id,
-            text=(
-                "⛔ <b>Developer conversation বন্ধ করা হয়েছে।</b>\n\n"
-                "এখন আপনি আবার Study, Leaderboard অথবা Developer ব্যবহার করতে পারবেন।"
-            ),
-            parse_mode="HTML",
-            reply_markup=get_main_keyboard()
-        )
-    except Exception as e:
-        print("Stop developer user notification error:", e)
-
-    await query.message.reply_text(
-        f"⛔ User <code>{user_id}</code>-এর Developer conversation বন্ধ হয়েছে।",
-        parse_mode="HTML"
-    )
-
 
 # ==================================================
 # SEND DEVELOPER REPLY
@@ -562,152 +504,57 @@ async def send_dev_reply(
     context: ContextTypes.DEFAULT_TYPE
 ):
 
-    if not update.message or not update.effective_user:
-        return False
+    if not update.message:
+        return
 
     if update.effective_chat.type != "private":
-        return False
+        return
 
-    dev_chat_id = int(os.getenv("DEV_CHAT_ID", "0"))
+    if DEV_CHAT_ID and update.effective_chat.id != DEV_CHAT_ID:
+        return
 
-    if not dev_chat_id or update.effective_user.id != dev_chat_id:
-        return False
-
-    target_user_id = context.user_data.get("reply_to_user")
+    target_user_id = context.user_data.get(
+        "reply_to_user"
+    )
 
     if not target_user_id:
-        return False
+        return
 
     message_text = update.message.text
 
     if not message_text:
-        return False
+        return
 
     try:
+
         await context.bot.send_message(
             chat_id=target_user_id,
             text=(
                 "👨‍💻 <b>Developer Reply</b>\n\n"
-                f"{message_text}"
+                f"{escape(message_text)}"
             ),
             parse_mode="HTML"
         )
 
-        context.user_data["reply_to_user"] = None
+        context.user_data[
+            "reply_to_user"
+        ] = None
 
         await update.message.reply_text(
             "✅ Reply User-এর কাছে পাঠানো হয়েছে।"
         )
 
     except Exception as e:
-        print("Developer reply error:", e)
+
+        print(
+            "Developer reply error:",
+            e
+        )
+
         await update.message.reply_text(
             "⚠️ User-এর কাছে Reply পাঠানো যায়নি।"
         )
 
-    return True
-
-
-# ==================================================
-# FORWARD USER MESSAGE TO DEVELOPER
-# ==================================================
-
-async def forward_user_message_to_dev(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
-
-    if not update.message or not update.effective_user:
-        return False
-
-    if update.effective_chat.type != "private":
-        return False
-
-    if not context.user_data.get("dev_active"):
-        return False
-
-    # Main menu buttons must always keep working.
-    text = update.message.text or ""
-
-    if text in (
-        "📚 Study",
-        "🏆 Leaderboard",
-        "👨‍💻 Developer"
-    ):
-        return False
-
-    dev_chat_id = int(os.getenv("DEV_CHAT_ID", "0"))
-
-    if not dev_chat_id:
-        context.user_data["dev_active"] = False
-        return False
-
-    user = update.effective_user
-
-    header = (
-        "📩 <b>Message from User</b>\n\n"
-        f"👤 <b>Name:</b> {user.full_name}\n"
-        f"🆔 <b>User ID:</b> <code>{user.id}</code>\n"
-    )
-
-    if user.username:
-        header += f"🔗 <b>Username:</b> @{user.username}\n"
-
-    header += "\n💬 <b>Message:</b>"
-
-    keyboard = [
-        [
-            InlineKeyboardButton(
-                "💬 Reply",
-                callback_data=f"reply_user:{user.id}"
-            ),
-            InlineKeyboardButton(
-                "⛔ Stop",
-                callback_data=f"stop_dev:{user.id}"
-            )
-        ]
-    ]
-
-    try:
-        await context.bot.send_message(
-            chat_id=dev_chat_id,
-            text=header,
-            parse_mode="HTML"
-        )
-
-        # Text message
-        if update.message.text:
-            await context.bot.send_message(
-                chat_id=dev_chat_id,
-                text=update.message.text,
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
-        else:
-            # Other message types are copied to Developer.
-            await context.bot.copy_message(
-                chat_id=dev_chat_id,
-                from_chat_id=update.effective_chat.id,
-                message_id=update.message.message_id
-            )
-
-            await context.bot.send_message(
-                chat_id=dev_chat_id,
-                text="👇 এই User-কে Reply করতে button ব্যবহার করুন।",
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
-
-    except Exception as e:
-        print("Forward user message error:", e)
-        await update.message.reply_text(
-            "⚠️ Message Developer-এর কাছে পাঠানো যায়নি।"
-        )
-
-    return True
-
-
-# ==================================================
-# SAVE STUDY TIME
-# ==================================================
 # ==================================================
 # SAVE STUDY TIME
 # ==================================================
@@ -747,7 +594,7 @@ async def save_study_time(
 
         if hours > 24:
             await update.message.reply_text(
-                "❌ ২৪ ঘণ্টার বেশি দেওয়া যাবে না।"
+                "❌ ২৪ ঘণ্টার বেশি 🤧"
             )
             return
 
@@ -755,7 +602,6 @@ async def save_study_time(
 
         await update.message.reply_text(
             "❌ সঠিক সংখ্যা দিন।\n\n"
-            "উদাহরণ: 2 অথবা 2.5"
         )
 
         return
@@ -861,9 +707,6 @@ async def study(
 
         await update.message.reply_text(
             "❌ কত ঘণ্টা পড়েছেন লিখুন।\n\n"
-            "উদাহরণ:\n"
-            "/study 2\n"
-            "/study 2.5"
         )
 
         return
@@ -880,7 +723,7 @@ async def study(
         if hours > 24:
 
             await update.message.reply_text(
-                "❌ ২৪ ঘণ্টার বেশি দেওয়া যাবে না।"
+                "❌ ২৪ ঘণ্টার বেশি 🤧।"
             )
 
             return
@@ -889,9 +732,7 @@ async def study(
 
         await update.message.reply_text(
             "❌ সঠিক সংখ্যা দিন।\n\n"
-            "উদাহরণ:\n"
-            "/study 2\n"
-            "/study 2.5"
+           
         )
 
         return
@@ -1111,34 +952,8 @@ async def leaderboard(
         )
 
         await update.message.reply_text(
-            "⚠️ Leaderboard দেখাতে "
-            "সমস্যা হয়েছে।"
+            "⚠️ Leaderboard দেখাতে সমস্যা হয়েছে।"
         )
-
-
-# ==================================================
-# DEVELOPER BUTTON
-# ==================================================
-
-async def developer_button(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
-
-    if not update.message:
-        return
-
-    if update.effective_chat.type != "private":
-        return
-
-    await update.message.reply_text(
-        "👨‍💻 <b>Developer</b>\n\n"
-        "📚 Amol Nama Study Bot\n\n"
-        "🤖 Study Time Tracker\n"
-        "🏆 Daily Leaderboard",
-        parse_mode="HTML",
-        reply_markup=get_main_keyboard()
-    )
 
 
 # ==================================================
@@ -1155,7 +970,7 @@ async def join_button(
 
     text = update.message.text
 
-    if text == "📨 OTP গ্রুপে জয়েন":
+    if text == "📨 গ্রুপে জয়েন":
 
         await update.message.reply_text(
             "👥 নিচের Group-এ Join করুন:\n\n"
@@ -1169,14 +984,6 @@ async def join_button(
         await update.message.reply_text(
             "📢 Channel-এ Join করুন:\n\n"
             "https://t.me/FixerZoneOfficial"
-        )
-
-        return
-
-    if text == "📣 ফেসবুক বট চ্যানেলে জয়েন":
-
-        await update.message.reply_text(
-            "📣 Facebook Bot Channel"
         )
 
         return
@@ -1214,95 +1021,106 @@ async def private_text_handler(
     if update.effective_chat.type != "private":
         return
 
-    text = update.message.text or ""
+    text = update.message.text
 
-    # --------------------------------------------------
-    # Main menu buttons ALWAYS have priority.
-    # --------------------------------------------------
+    # ----------------------------------------------
+    # Developer Reply
+    # ----------------------------------------------
 
-    if text == "📚 Study":
-        context.user_data["dev_active"] = False
-        context.user_data["reply_to_user"] = None
-        await study_button(update, context)
-        return
+    if context.user_data.get(
+        "reply_to_user"
+    ):
 
-    if text == "🏆 Leaderboard":
-        context.user_data["dev_active"] = False
-        context.user_data["waiting_for_study"] = False
-        context.user_data["reply_to_user"] = None
-        await leaderboard(update, context)
-        return
-
-    if text == "👨‍💻 Developer":
-        await developer_button(update, context)
-        return
-
-    # --------------------------------------------------
-    # Developer conversation.
-    # --------------------------------------------------
-
-    if context.user_data.get("dev_active"):
-        handled = await forward_user_message_to_dev(
+        await send_dev_reply(
             update,
             context
         )
-        if handled:
-            return
 
-    # --------------------------------------------------
-    # Waiting for study number.
-    # --------------------------------------------------
+        return
+    # ----------------------------------------------
+    # Waiting for study number
+    # ----------------------------------------------
 
-    if context.user_data.get("waiting_for_study"):
+    if context.user_data.get(
+        "waiting_for_study"
+    ):
 
+        # Join button হলে study input হিসেবে নেবে না
         if text in (
             "📨 OTP গ্রুপে জয়েন",
             "📢 চ্যানেলে জয়েন",
+            "📣 ফেসবুক বট চ্যানেলে জয়েন",
             "✅ জয়েন করেছি"
         ):
-            await join_button(update, context)
+            await join_button(
+                update,
+                context
+            )
             return
 
-        await save_study_time(update, context)
+        await save_study_time(
+            update,
+            context
+        )
+
         return
 
-    # --------------------------------------------------
-    # Join menu buttons.
-    # --------------------------------------------------
+    # ----------------------------------------------
+    # Study
+    # ----------------------------------------------
+
+    if text == "📚 Study":
+
+        await study_button(
+            update,
+            context
+        )
+
+        return
+
+    # ----------------------------------------------
+    # Leaderboard
+    # ----------------------------------------------
+
+    if text == "🏆 Leaderboard":
+
+        await leaderboard(
+            update,
+            context
+        )
+
+        return
+
+    # ----------------------------------------------
+    # Developer
+    # ----------------------------------------------
+
+    if text == "👨‍💻 Developer":
+
+        await developer_button(
+            update,
+            context
+        )
+
+        return
+
+    # ----------------------------------------------
+    # Join menu buttons
+    # ----------------------------------------------
 
     if text in (
         "📨 OTP গ্রুপে জয়েন",
         "📢 চ্যানেলে জয়েন",
+        "📣 ফেসবুক বট চ্যানেলে জয়েন",
         "✅ জয়েন করেছি"
     ):
-        await join_button(update, context)
+
+        await join_button(
+            update,
+            context
+        )
+
         return
-
-
-# ==================================================
-# DEVELOPER MESSAGE HANDLER
-# ==================================================
-
-async def developer_message_handler(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
-
-    if not update.message or not update.effective_user:
-        return
-
-    dev_chat_id = int(os.getenv("DEV_CHAT_ID", "0"))
-
-    if not dev_chat_id:
-        return
-
-    if update.effective_chat.type != "private":
-        return
-
-    if update.effective_user.id != dev_chat_id:
-        return
-
-    await send_dev_reply(update, context)
 
 
 # ==================================================
@@ -1487,52 +1305,53 @@ async def main():
     )
 
     # ----------------------------------------------
+    # Private buttons / text
+    # ----------------------------------------------
+
+    application.add_handler(
+        MessageHandler(
+            filters.Regex("^📚 Study$"),
+            study_button
+        )
+    )
+
+    application.add_handler(
+        MessageHandler(
+            filters.Regex("^🏆 Leaderboard$"),
+            leaderboard
+        )
+    )
+
+    application.add_handler(
+        MessageHandler(
+            filters.Regex("^👨‍💻 Developer$"),
+            developer_button
+        )
+    )
+
+    application.add_handler(
+        MessageHandler(
+            filters.TEXT & ~filters.COMMAND,
+            private_text_handler
+        )
+    )
+
+    # ----------------------------------------------
     # Developer callbacks
     # ----------------------------------------------
 
     application.add_handler(
         CallbackQueryHandler(
             contact_dev,
-            pattern=r"^contact_dev$"
+            pattern="^contact_dev$"
         )
     )
 
     application.add_handler(
         CallbackQueryHandler(
             reply_to_user,
-            pattern=r"^reply_user:\d+$"
+            pattern="^reply_user:"
         )
-    )
-
-    application.add_handler(
-        CallbackQueryHandler(
-            stop_dev,
-            pattern=r"^stop_dev:\d+$"
-        )
-    )
-
-    # ----------------------------------------------
-    # Developer's own private messages
-    # ----------------------------------------------
-
-    application.add_handler(
-        MessageHandler(
-            filters.ChatType.PRIVATE & filters.TEXT & ~filters.COMMAND,
-            developer_message_handler
-        ),
-        group=0
-    )
-
-    # ----------------------------------------------
-    # All private user text / buttons
-    # ----------------------------------------------
-
-    application.add_handler(
-        MessageHandler(
-            filters.ChatType.PRIVATE & filters.TEXT & ~filters.COMMAND,
-            private_text_handler
-        ),
-        group=1
     )
 
     await application.initialize()
