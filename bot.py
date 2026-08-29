@@ -1387,8 +1387,6 @@ async def main():
 
     await application.initialize()
 
-    await application.initialize()
-
     await application.start()
 
     await application.updater.start_polling(
