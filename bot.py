@@ -295,7 +295,7 @@ async def study(
     "study_hours"
 ).upsert(
     data,
-    on_conflict="user_id,study_date"
+    on_conflict="chat_id,user_id,study_date"
 ).execute()
 
 
